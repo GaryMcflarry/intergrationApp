@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [.github/workflows/installers.yml]
+    paths: [.github/workflows/installers.yml, 'deploy/**', 'app/guide/**']
 
 permissions:
   contents: read
@@ -20,6 +20,7 @@ jobs:
         run: |
           set -euo pipefail
           docker build -f deploy/Dockerfile -t astrum-site .
+          docker run --rm --entrypoint /bin/sh astrum-site -c 'test -r /srv/astrum-artifacts/download/windows'
           docker run --rm astrum-site nginx -t
           docker run -d --name astrum-site -p 127.0.0.1:8080:8080 astrum-site
           trap 'docker logs astrum-site >&2; docker rm -f astrum-site >/dev/null' EXIT
@@ -32,6 +33,7 @@ jobs:
           done
           test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/api/status")" = 404
           curl -fsSI "$base/download/windows" | grep -i '^content-type: application/octet-stream'
+          test "$(curl -fsS -r 0-1023 -o /dev/null -w '%{http_code}' "$base/download/windows")" = 206
           expected=$(sed -n 's/^ARG ASTRUM_WINDOWS_SHA256=//p' deploy/Dockerfile)
           curl -fsS "$base/download/windows" | sha256sum | grep -F "$expected"
 
