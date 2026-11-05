@@ -10,6 +10,30 @@ permissions:
   contents: read
 
 jobs:
+  website:
+    name: Dokploy site
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check public guides and installer download
+        run: |
+          set -euo pipefail
+          docker build -f deploy/Dockerfile -t astrum-site .
+          docker run -d --rm --name astrum-site -p 127.0.0.1:8080:8080 astrum-site
+          trap 'docker rm -f astrum-site >/dev/null' EXIT
+          base=http://127.0.0.1:8080
+          curl -fsS --retry 8 --retry-connrefused --retry-delay 1 "$base/" > "$RUNNER_TEMP/astrum-home.html"
+          curl -fsS "$base/setup.html" > "$RUNNER_TEMP/astrum-setup.html"
+          for service in spotify youtube discord; do
+            grep -F "setup.html#$service" "$RUNNER_TEMP/astrum-home.html"
+            grep -F "id=\"$service\"" "$RUNNER_TEMP/astrum-setup.html"
+          done
+          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/api/status")" = 404
+          curl -fsSI "$base/download/windows" | grep -i '^content-type: application/octet-stream'
+          expected=$(sed -n 's/^ARG ASTRUM_WINDOWS_SHA256=//p' deploy/Dockerfile)
+          curl -fsS "$base/download/windows" | sha256sum | grep -F "$expected"
+
   windows:
     name: Windows x64
     runs-on: windows-2025
@@ -28,6 +52,7 @@ jobs:
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: |
+          if (!$env:WIN_CSC_LINK) { Remove-Item Env:WIN_CSC_LINK, Env:WIN_CSC_KEY_PASSWORD -ErrorAction SilentlyContinue }
           npx --no-install electron-builder --win nsis --x64 --publish never
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $installer = Get-ChildItem dist -Filter '*Setup*.exe' | Select-Object -First 1
@@ -95,6 +120,7 @@ jobs:
             printf '%s' "$APPLE_API_KEY_B64" | base64 -D > "$APPLE_API_KEY"
             args+=(-c.forceCodeSigning=true)
           else
+            unset CSC_LINK CSC_KEY_PASSWORD
             args+=(-c.mac.identity=- -c.mac.hardenedRuntime=false)
           fi
           npx --no-install electron-builder --mac dmg "--$ARCH" --publish never "${args[@]}"
@@ -107,7 +133,7 @@ jobs:
           trap 'if [[ -n "$pid" ]]; then kill "$pid" 2>/dev/null || true; fi; hdiutil detach "$mount"' EXIT
           ditto "$mount/Astrum.app" "$target"
           codesign --verify --deep --strict "$target"
-          if [[ -n "$CSC_LINK" ]]; then
+          if [[ -n "${CSC_LINK:-}" ]]; then
             spctl --assess --type execute "$target"
             xcrun stapler validate "$target"
           fi
