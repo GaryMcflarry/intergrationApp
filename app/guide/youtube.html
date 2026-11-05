@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YouTube Music · integrationApp</title>
+<title>YouTube · Astrum</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap">
@@ -11,8 +11,8 @@
 </head>
 <body style="--acc:#ff8a84">
 <main>
-  <header class="top"><span class="logo" id="logo"></span><h1><small>integrationApp · set up</small>YouTube Music</h1></header>
-  <p class="lead">The island plays YouTube Music in YouTube's own player, and brings in <b>your playlists and liked songs</b> (read-only) through a Google app of your own. YouTube gives apps no recommendations feed, so <i>For you</i> uses YouTube's own mixes started from songs you like.</p>
+  <header class="top"><span class="logo" id="logo"></span><h1><small>Astrum · set up</small>YouTube</h1></header>
+  <p class="lead">Watch videos and play music in the island. Paste a YouTube video link in <b>Search</b> to play it without signing in. Connect a Google app to search, see popular videos, and browse <b>your playlists and liked videos</b> with read-only access.</p>
 
   <section class="card">
     <h2>1 · Make a Google app</h2>
@@ -29,7 +29,7 @@
     <label class="f">Client ID<input type="text" id="cid" spellcheck="false" autocomplete="off" placeholder="…apps.googleusercontent.com"></label>
     <div class="row"><button type="button" class="go" id="connect">Sign in with Google</button><button type="button" id="out" hidden>Remove my library</button></div>
     <p class="msg" id="msg" aria-live="polite"></p>
-    <p class="note">While the Google app is in testing, Google warns that it is not verified: press <b>Continue</b>. Sign in again here any time to bring in new playlists.</p>
+    <p class="note">If your Google app is in testing, Google may show an unverified app prompt. Sign in again here when search or browsing asks you to reconnect.</p>
   </section>
   <footer><a href="http://127.0.0.1:43210/guide/">← All set-up</a></footer>
 </main>
@@ -61,7 +61,7 @@
     if (!/\.apps\.googleusercontent\.com$/.test(id)) { IA.say($('msg'), 'Paste your Client ID first (it ends in .apps.googleusercontent.com).'); $('cid').focus(); return; }
     Y.setClientId(id); IA.say($('msg'), 'Waiting for Google…');
     Y.fetchLibrary('select_account').then(function (lib) {
-      return handOver().then(function () { IA.say($('msg'), 'Done: ' + lib.pls.length + ' playlists and ' + lib.liked.length + ' liked songs are in the island. You can close this tab.', true); return IA.status().then(paint); });
+      return handOver().then(function () { IA.say($('msg'), 'Connected. The island can search YouTube and access your playlists and liked videos.', true); return IA.status().then(paint); });
     }).catch(function (e) { IA.say($('msg'), /has not been used|disabled/i.test(e.message) ? 'Turn on "YouTube Data API v3" for your project (step 1), then try again.' : e.message); });
   });
   $('out').addEventListener('click', function () {

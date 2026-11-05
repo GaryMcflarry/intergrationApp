@@ -24,7 +24,7 @@ test('Rich Presence: a playing song becomes a Listening activity; nothing playin
   assert.equal(activityFor({ ...song, playing: false }), null);
   assert.equal(activityFor(null), null);
   const yt = activityFor({ ...song, source: 'youtube', artist: '', art: 'http://not-https/x.jpg', url: 'javascript:alert(1)', title: 'x'.repeat(300) });
-  assert.equal(yt.state, 'YouTube Music');
+  assert.equal(yt.state, 'YouTube');
   assert.equal(yt.largeImageKey, undefined);
   assert.equal(yt.buttons, undefined);
   assert.equal(yt.details.length, 128);
@@ -99,4 +99,27 @@ test('Server: serves the app on its own addresses only, nothing outside the app 
   assert.equal((await get('/../secret.txt')).s, 404);
   assert.equal((await get('/%2e%2e/secret.txt')).s, 404);
   srv.close();
+});
+
+test('Server: download is limited to the configured Windows installer', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ia-download-'));
+  const installer = path.join(root, 'Astrum Setup 1.0.0.exe');
+  const appDir = path.join(root, 'app');
+  fs.mkdirSync(appDir);
+  const data = Buffer.from([0x4d, 0x5a, 0x00, 0xff]);
+  fs.writeFileSync(installer, data);
+  const port = 44000 + Math.floor(Math.random() * 500);
+  const srv = await server.start(appDir, port, null, installer);
+  const url = `http://127.0.0.1:${port}/download/windows`;
+  try {
+    const info = await fetch(url, { method: 'HEAD' });
+    assert.equal(info.status, 200);
+    assert.equal(info.headers.get('content-length'), String(data.length));
+    assert.equal(info.headers.get('content-disposition'), 'attachment; filename="Astrum Setup 1.0.0.exe"');
+    assert.equal(info.headers.get('cross-origin-resource-policy'), 'same-origin');
+    const file = await fetch(url + '?file=other.exe');
+    assert.deepEqual(Buffer.from(await file.arrayBuffer()), data);
+    assert.equal((await fetch(url + '/other.exe')).status, 404);
+    assert.equal((await fetch(url, { method: 'POST' })).status, 405);
+  } finally { srv.close(); }
 });

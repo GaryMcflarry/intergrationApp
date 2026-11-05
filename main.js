@@ -1,5 +1,5 @@
 'use strict';
-/* integrationApp: a Dynamic Island at the top of your desktop, for Spotify, YouTube Music and Discord.
+/* Astrum: a Dynamic Island at the top of your desktop, for Spotify, YouTube and Discord.
    - the island: a small pill (what plays, or Discord) that opens into tabs, then the full player, then the whole screen
    - set-up happens in your browser: guide pages served by this app connect each service and hand the result over
    - Discord: Rich Presence follows what plays, a bot of yours brings in the latest messages, Share posts a song */
@@ -17,8 +17,10 @@ const ORIGIN = `http://127.0.0.1:${server.PORT}`;     // the island, the guides,
 const GOOGLE = `http://localhost:${server.PORT}`;     // the YouTube guide (Google signs in here)
 const GUIDES = { index: ORIGIN + '/guide/', spotify: ORIGIN + '/guide/spotify.html', youtube: GOOGLE + '/guide/youtube.html', discord: ORIGIN + '/guide/discord.html' };
 
+// The app was called integrationApp: keep its data folder (sign-ins, settings, the island's storage) under the new name
+app.setPath('userData', path.join(app.getPath('appData'), 'integrationApp'));
 // Google refuses sign-in inside apps that say they are Electron: present as the Chrome it is built on
-app.userAgentFallback = app.userAgentFallback.replace(/\s?Electron\/\S+/, '').replace(/\s?integrationApp\/\S+/i, '');
+app.userAgentFallback = app.userAgentFallback.replace(/\s?Electron\/\S+/, '').replace(/\s?(integrationApp|Astrum)\/\S+/i, '');
 if (!app.requestSingleInstanceLock()) app.quit();
 
 let island = null, tray = null, store = null, presence = null, bot = null, quitting = false, full = null, lastStatus = { text: 'Starting…', ok: false };
@@ -53,19 +55,48 @@ async function setBotToken(token) {
 }
 
 /* ---------- the island window ---------- */
+let islandSize = { width: 300, height: 64 };
 function workArea() { return screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea; }
-function placeIsland(w, h) {
-  if (!island || full) return;
-  const d = screen.getDisplayMatching(island.getBounds()).workArea;
-  const width = Math.max(120, Math.min(d.width, Math.round(w))), height = Math.max(40, Math.min(d.height, Math.round(h)));
-  island.setBounds({ x: Math.round(d.x + (d.width - width) / 2), y: d.y, width, height });
+function islandBounds(d) {
+  const width = Math.min(d.width, islandSize.width), height = Math.min(d.height, islandSize.height);
+  return { x: Math.round(d.x + (d.width - width) / 2), y: d.y, width, height };
 }
+function islandDisplay() { return screen.getDisplayMatching(island.getBounds()); }
+function placeIsland(display) {   // at the top middle of a screen (its own, unless another is given)
+  if (!island || full || drag) return;
+  island.setBounds(islandBounds((display || islandDisplay()).workArea));
+}
+
+/* ---------- moving the island: dragged by its handle, or following the mouse to another screen ---------- */
+// roam: the island goes to whichever screen the mouse is on (only while it is a closed pill); the island page says
+// whether that is wanted (a setting) and how open it is
+let roam = false, islandLevel = 0, drag = null;
+function stopDrag() { if (drag) { clearInterval(drag.timer); drag = null; } }
+function dragIsland(phase) {
+  if (phase === 'start' && !full && !drag) {
+    const c = screen.getCursorScreenPoint(), b = island.getBounds();
+    // the window follows the mouse, keeping its size: moved between screens of different scaling, Windows would
+    // otherwise resize it on the way (and the island would jump away from the mouse)
+    drag = { dx: c.x - b.x, dy: c.y - b.y, w: b.width, h: b.height, timer: setInterval(() => {
+      if (!island) return; const p = screen.getCursorScreenPoint();
+      island.setBounds({ x: p.x - drag.dx, y: p.y - drag.dy, width: drag.w, height: drag.h });
+    }, 16) };
+  } else if (phase === 'end' && drag) {   // let go: to the top middle of the screen it was dropped on
+    stopDrag();
+    placeIsland(screen.getDisplayNearestPoint(screen.getCursorScreenPoint()));
+  }
+}
+setInterval(() => {
+  if (!island || full || drag || !roam || islandLevel > 0 || !island.isVisible()) return;
+  const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  if (d.id !== islandDisplay().id) placeIsland(d);
+}, 350);
 function createIsland() {
-  const d = workArea();
+  islandSize = { width: 300, height: 64 };
   island = new BrowserWindow({
-    width: 300, height: 64, x: Math.round(d.x + (d.width - 300) / 2), y: d.y,
+    ...islandBounds(workArea()),
     frame: false, transparent: true, resizable: false, movable: false, minimizable: false, maximizable: false, fullscreenable: false,
-    hasShadow: false, skipTaskbar: true, alwaysOnTop: true, show: false, title: 'integrationApp', backgroundColor: '#00000000',
+    hasShadow: false, skipTaskbar: true, alwaysOnTop: true, show: false, title: 'Astrum', backgroundColor: '#00000000',
     icon: nativeImage.createFromDataURL(ICON),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false }
   });
@@ -79,20 +110,19 @@ function createIsland() {
   });
   island.loadURL(ORIGIN + '/island.html');
   island.once('ready-to-show', () => island.showInactive());
-  island.on('closed', () => { island = null; });
-  screen.on('display-metrics-changed', () => island && island.webContents.send('island-reflow'));
+  island.on('closed', () => { stopDrag(); island = null; full = null; });
 }
 
 function buildTray() {
   tray = new Tray(nativeImage.createFromDataURL(ICON));
-  tray.setToolTip('integrationApp');
+  tray.setToolTip('Astrum');
   const menu = () => Menu.buildFromTemplate([
     { label: 'Show the island', click: () => { if (!island) createIsland(); else island.showInactive(); } },
     { label: 'Hide the island', click: () => island && island.hide() },
     { type: 'separator' },
     { label: 'Set up (opens in your browser)…', click: () => openGuide('index') },
     { label: 'Spotify…', click: () => openGuide('spotify') },
-    { label: 'YouTube Music…', click: () => openGuide('youtube') },
+    { label: 'YouTube…', click: () => openGuide('youtube') },
     { label: 'Discord…', click: () => openGuide('discord') },
     { type: 'separator' },
     { label: 'Start with this computer', type: 'checkbox', checked: store.settings().openAtLogin, click: (m) => applySettings({ openAtLogin: m.checked }) },
@@ -126,12 +156,29 @@ function wire() {
   ipcMain.handle('settings-get', (e) => (fromApp(e) ? publicSettings() : null));
   ipcMain.on('island', (e, what, a, b) => {
     if (!fromApp(e) || !island || BrowserWindow.fromWebContents(e.sender) !== island) return;
-    if (what === 'size') placeIsland(a, b);
-    else if (what === 'full') {   // the whole screen (the full view, DJ mode, Discord), and back
-      if (a && !full) { full = island.getBounds(); const d = screen.getDisplayMatching(full).bounds; island.setBounds(d); island.focus(); }
-      else if (!a && full) { const back = full; full = null; island.setBounds(back); }
-    } else if (what === 'focus') island.focus();
+    if (what === 'size' && Number.isFinite(a) && Number.isFinite(b)) {
+      islandSize = { width: Math.max(120, Math.round(a)), height: Math.max(40, Math.round(b)) };
+      placeIsland();
+    }
+    else if (what === 'drag') dragIsland(a);
+    else if (what === 'state') { roam = !!a; islandLevel = Number(b) || 0; }
+    else if (what === 'focus') island.focus();
     else if (what === 'blur') island.blur();
+  });
+  ipcMain.handle('island-full', (e, on) => {
+    if (!fromApp(e) || !island || BrowserWindow.fromWebContents(e.sender) !== island) return false;
+    if (on) {
+      if (!full) full = island.getBounds();
+      stopDrag();
+      const bounds = screen.getDisplayMatching(full).bounds;
+      island.setBounds(bounds);
+      island.focus();
+      return { width: bounds.width, height: bounds.height };
+    } else if (full) {
+      const previousDisplay = screen.getDisplayMatching(full);
+      full = null; placeIsland(previousDisplay);
+    }
+    return true;
   });
   ipcMain.on('open-guide', (e, what) => { if (fromApp(e)) openGuide(String(what || 'index')); });
   ipcMain.on('discord-update', (e, track) => { if (fromApp(e)) presence.update(track && typeof track === 'object' ? track : null); });
@@ -153,12 +200,15 @@ app.whenReady().then(async () => {
     origins: [ORIGIN, GOOGLE], store, spotifyAuth, bot, presence, applySettings, setKv, setBotToken,
     hasBotToken: () => !!store.settings().botToken, presenceStatus: () => lastStatus
   });
-  try { await server.start(path.join(__dirname, 'app'), server.PORT, api); }
+  const installer = process.platform === 'win32' && !app.isPackaged
+    ? path.join(__dirname, 'dist', `Astrum Setup ${app.getVersion()}.exe`) : null;
+  try { await server.start(path.join(__dirname, 'app'), server.PORT, api, installer); }
   catch (e) {
-    dialog.showErrorBox('integrationApp', `Port ${server.PORT} on this computer is in use (${e.code || e.message}). Is integrationApp already open? Close the other copy and try again.`);
+    dialog.showErrorBox('Astrum', `Port ${server.PORT} on this computer is in use (${e.code || e.message}). Is Astrum already open? Close the other copy and try again.`);
     app.quit(); return;
   }
   wire();
+  screen.on('display-metrics-changed', () => { placeIsland(); if (island) island.webContents.send('island-reflow'); });
   createIsland();
   buildTray();
   const s = store.settings();

@@ -3,57 +3,75 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Set up integrationApp</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap">
+<meta name="description" content="Astrum gives your desktop a small player for Spotify, YouTube, and Discord. Download the Windows app and connect the services you use.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<title>Astrum for desktop</title>
 <link rel="stylesheet" href="guide.css">
 </head>
-<body>
-<main>
-  <header class="top"><span class="logo" id="logo"></span><h1><small>integrationApp</small>Set up your island</h1></header>
-  <p class="lead">integrationApp lives at the <b>top of your screen</b> as a small black island. It shows what is playing on Spotify or YouTube Music (or Discord, when nothing plays). <b>Hover</b> or <b>click</b> it for the three tabs and what is playing; <b>drag it down</b> (or press ⌄) for the full player or your Discord channels; press ⛶ to cover the whole screen. Pin keeps it open; Esc or dragging up closes it.</p>
-
-  <section class="card">
-    <div class="svc"><span id="i-sp"></span><div><h2>Spotify</h2><p id="s-sp">Checking…</p></div><a class="btn go" style="--accent:var(--sp)" href="spotify.html">Set up</a></div>
+<body class="landing">
+<header class="site-nav">
+  <a class="brand" href="#overview"><span class="brand-mark" aria-hidden="true">✦</span>Astrum</a>
+  <nav aria-label="Main"><a href="#overview">Overview</a><a href="#integrations">Setup</a></nav>
+</header>
+<main id="overview" class="landing-main">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <p class="eyebrow"><span></span> Desktop app</p>
+      <h1 id="hero-title">Media controls for your desktop.</h1>
+      <p class="lead">Play Spotify, watch YouTube, and catch up on Discord from a small island at the top of your screen.</p>
+      <div class="hero-actions">
+        <a class="btn download" id="download" href="/download/windows" download hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 18v3h14v-3"/></svg>Download for Windows</a>
+        <a class="btn secondary" href="#integrations">Set up Astrum <span aria-hidden="true">↘</span></a>
+      </div>
+      <p class="download-note" id="download-note" aria-live="polite">Checking for an installer…</p>
+    </div>
+    <figure class="app-preview" aria-label="Preview of the Astrum island and expanded player">
+      <div class="preview-stage" aria-hidden="true">
+        <div class="preview-pill"><span class="preview-dot"></span><span>Night Drive</span><span class="preview-wave"><i></i><i></i><i></i><i></i></span></div>
+        <div class="preview-tablet">
+          <div class="preview-tabs"><span class="preview-tab">Spotify</span><span class="preview-service" id="preview-yt"></span><span class="preview-service" id="preview-dc"></span><span class="preview-expand">⤢</span></div>
+          <div class="preview-track"><span class="preview-cover"></span><div><strong>Night Drive</strong><span>Sample track</span></div></div>
+          <div class="preview-progress"></div>
+          <div class="preview-controls"><span>‹</span><span class="preview-play">▶</span><span>›</span></div>
+        </div>
+      </div>
+      <figcaption>Compact island and expanded player</figcaption>
+    </figure>
   </section>
-  <section class="card">
-    <div class="svc"><span id="i-yt"></span><div><h2>YouTube Music</h2><p id="s-yt">Checking…</p></div><a class="btn go" style="--accent:var(--yt)" id="ytlink" href="youtube.html">Set up</a></div>
+  <section id="integrations" class="integrations" aria-labelledby="setup-title">
+    <div class="section-heading">
+      <p class="eyebrow">Setup</p>
+      <h2 id="setup-title">Connect the apps you use</h2>
+      <p>Open Astrum, then follow the guide for each service you want in the island.</p>
+    </div>
+    <div class="service-grid">
+      <article class="service-card">
+        <div class="service-top"><span class="service-icon" id="i-sp" aria-hidden="true"></span><span class="service-status" id="s-sp" aria-live="polite">Open Astrum to connect</span></div>
+        <h3>Spotify</h3>
+        <p>See what’s playing, browse your library, and switch playback devices.</p>
+        <a class="service-link" href="spotify.html" id="sp-link">Set up Spotify <span aria-hidden="true">↗</span></a>
+      </article>
+      <article class="service-card">
+        <div class="service-top"><span class="service-icon" id="i-yt" aria-hidden="true"></span><span class="service-status" id="s-yt" aria-live="polite">Open Astrum to connect</span></div>
+        <h3>YouTube</h3>
+        <p>Watch a video from a link or connect Google to search and browse playlists.</p>
+        <a class="service-link" href="youtube.html" id="yt-link">Set up YouTube <span aria-hidden="true">↗</span></a>
+      </article>
+      <article class="service-card">
+        <div class="service-top"><span class="service-icon" id="i-dc" aria-hidden="true"></span><span class="service-status" id="s-dc" aria-live="polite">Open Astrum to connect</span></div>
+        <h3>Discord</h3>
+        <p>Show what’s playing, see messages from selected channels, or share a track.</p>
+        <a class="service-link" href="discord.html" id="dc-link">Set up Discord <span aria-hidden="true">↗</span></a>
+      </article>
+    </div>
   </section>
-  <section class="card">
-    <div class="svc"><span id="i-dc"></span><div><h2>Discord</h2><p id="s-dc">Checking…</p></div><a class="btn go" style="--accent:var(--dc)" href="discord.html">Set up</a></div>
+  <section class="preferences" id="preferences" aria-labelledby="prefs-title" hidden>
+    <div><h2 id="prefs-title">Desktop preferences</h2><p>Use the tray icon to show or hide the island, reopen this page, or quit Astrum.</p></div>
+    <div><label class="check"><input type="checkbox" id="login"> Start Astrum when I sign in</label><p class="msg" id="msg" role="status"></p></div>
   </section>
-
-  <section class="card">
-    <h2>The app</h2>
-    <label class="check"><input type="checkbox" id="login"> Start integrationApp with this computer</label>
-    <p class="note">The island sits on top of other windows. The tray icon (by the clock) shows or hides it, opens this guide, and quits the app.</p>
-    <p class="msg" id="msg"></p>
-  </section>
-  <footer><span>These pages are served by integrationApp on this computer only.</span></footer>
 </main>
+<footer class="site-footer"><span>Astrum</span><span>Account setup runs on your computer.</span></footer>
 <script src="guide.js"></script>
-<script>
-(function () {
-  'use strict';
-  var $ = IA.$;
-  $('logo').innerHTML = IA.ICON.app; $('i-sp').innerHTML = IA.ICON.sp; $('i-yt').innerHTML = IA.ICON.yt; $('i-dc').innerHTML = IA.ICON.dc;
-  $('ytlink').href = 'http://localhost:' + location.port + '/guide/youtube.html';   // Google signs in on localhost
-  function ok(el, yes, text) { el.textContent = text; el.style.color = yes ? 'var(--sp)' : ''; }
-  IA.status().then(function (s) {
-    ok($('s-sp'), s.spotify.connected, s.spotify.connected ? 'Connected.' : s.spotify.client ? 'Client ID added: connect your account.' : 'Not set up yet.');
-    var lib = s.youtube.library; ok($('s-yt'), !!lib, lib ? 'Connected: ' + lib.playlists + ' playlists, ' + lib.liked + ' liked songs.' : 'Not set up yet.');
-    var d = s.discord, parts = [];
-    if (d.appId) parts.push('Rich Presence ' + (d.presenceStatus && d.presenceStatus.ok ? 'connected' : 'set up'));
-    if (d.bot) parts.push('messages from ' + d.channels.length + ' channel' + (d.channels.length === 1 ? '' : 's'));
-    if (d.webhook) parts.push('sharing to a channel');
-    ok($('s-dc'), parts.length > 0, parts.length ? parts.join(' · ') + '.' : 'Not set up yet.');
-    $('login').checked = !!s.app.openAtLogin;
-  }, function (e) { IA.say($('msg'), e.message); });
-  $('login').addEventListener('change', function () {
-    IA.api('/api/app', { openAtLogin: this.checked }).then(function () { IA.say($('msg'), 'Saved.', true); }, function (e) { IA.say($('msg'), e.message); });
-  });
-})();
-</script>
+<script src="landing.js"></script>
 </body>
 </html>

@@ -1,8 +1,8 @@
 {
   "name": "integration-app",
-  "productName": "integrationApp",
+  "productName": "Astrum",
   "version": "1.0.0",
-  "description": "A desktop music widget: Spotify and YouTube Music, with Discord Rich Presence.",
+  "description": "A desktop music widget: Spotify and YouTube, with Discord Rich Presence.",
   "main": "main.js",
   "private": true,
   "license": "UNLICENSED",
@@ -24,7 +24,7 @@
   },
   "build": {
     "appId": "com.garymcflarry.integrationapp",
-    "productName": "integrationApp",
+    "productName": "Astrum",
     "files": ["main.js", "preload.js", "lib/**", "app/**", "package.json"],
     "win": { "target": ["nsis", "portable"] },
     "mac": { "target": ["dmg"], "category": "public.app-category.music" },

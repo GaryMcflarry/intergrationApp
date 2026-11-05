@@ -17,7 +17,9 @@ contextBridge.exposeInMainWorld('desktop', {
   settings: { get: () => ipcRenderer.invoke('settings-get'), onChange: onSettings },
   island: {
     size: (w, h) => ipcRenderer.send('island', 'size', Number(w), Number(h)),
-    full: (on2) => ipcRenderer.send('island', 'full', !!on2),
+    drag: (phase) => ipcRenderer.send('island', 'drag', phase === 'start' ? 'start' : 'end'),   // the window follows the mouse until 'end'
+    state: (roam, level) => ipcRenderer.send('island', 'state', !!roam, Number(level) || 0),   // follow the mouse to other screens? how open is it?
+    full: (on2) => ipcRenderer.invoke('island-full', !!on2),
     focus: () => ipcRenderer.send('island', 'focus'),
     blur: () => ipcRenderer.send('island', 'blur'),
     onReflow, onPoke

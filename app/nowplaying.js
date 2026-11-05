@@ -11,7 +11,7 @@
    NowPlaying.attach(id, row)  puts the player on a wallpaper and wires its settings row (a switch per wallpaper).
    Signing in happens once, on spotify.html (the one address to register with Spotify), and every wallpaper shares it.
    Controls (play, skip, seek, volume, queue, devices ...) need Spotify Premium; reading what is playing does not. */
-/* integrationApp: this is the Worlds wallpapers' player, running as a desktop widget. opts.app sets the app mode (the
+/* Astrum: this is the Worlds wallpapers' player, running as a desktop widget. opts.app sets the app mode (the
    player fills the widget, no wallpaper speaker: Electron has no Widevine), and it tells the app what is playing through
    'np:track' events (for Discord) and when its full view opens ('np:view', so the window can go full screen). */
 window.NowPlaying = (function () {
@@ -139,7 +139,8 @@ window.NowPlaying = (function () {
     '.np .np-tog.on::after{content:"";position:absolute;margin-top:26px;width:4px;height:4px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}',
     '.np-vol{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px}.np-vol svg{width:18px;height:18px;fill:currentColor;opacity:.7}',
     '.np-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11.5px;color:var(--np-ink2)}',
-    '.np-foot a{color:var(--np-hi);text-decoration:none;font-weight:700}',
+    '.np-foot a,.np-foot button{color:var(--np-hi);text-decoration:none;font-weight:700}',
+    '.np .np-foot button{width:auto;height:auto;padding:4px 6px;border-radius:6px}',
     '.np-note{font-size:11.5px;color:#ffd38a;margin:0}.np-note:empty{display:none}',
     '/* the lists: queue, search results, library, devices */',
     '.np-list{list-style:none;margin:0;padding:0;display:grid;gap:2px;max-height:320px;overflow-y:auto;scrollbar-width:thin;min-width:0}',
@@ -216,7 +217,7 @@ window.NowPlaying = (function () {
     '.np-lab{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--np-ink2);margin-bottom:-6px}',
     '.np.sk-normandy .np-acts button,.np.sk-normandy .np-djgo{border-radius:0}',
     '.np.sk-normandy.big{width:min(400px,calc(100vw - 32px))}.np.sk-normandy.big.wide{width:min(780px,calc(100vw - 56px))}',
-    '/* the source tabs: Spotify or YouTube Music, in the same card */',
+    '/* the source tabs: Spotify or YouTube, in the same card */',
     '.np-src{display:flex;align-items:center;gap:4px;padding:8px 12px 0}.np-src[hidden]{display:none}.np-srctabs{display:flex;gap:14px}.np-srctabs[hidden]{display:none}',
     '.np .np-djbtn svg{fill:none;width:18px;height:18px}',
     '.np.playing .np-mini .np-art,.np-yt .np-mini .np-art{cursor:pointer}',
@@ -242,11 +243,12 @@ window.NowPlaying = (function () {
     '.np .np-share svg{fill:none}.np-shares[hidden]{display:none}',
     '/* the desktop app: the player is the widget */',
     '.np.in-app .np-here,.np.in-app .np-herenote{display:none}',
+    '.np.in-app.np-idle{cursor:default}.np.in-app.np-idle .np-btns{display:flex}.np.in-app.big.np-idle .np-more{display:grid}',
     '/* YouTube in the full view: the player card is hidden except its video, which moves to where the cover goes */',
     '.np-dj.m-yt{z-index:19}.np-dj.m-yt .dj-cover{visibility:hidden;aspect-ratio:16/9;height:auto;width:min(58vw,720px,calc((100vh - 280px) * 16 / 9))}',
     '.np.yt-full{visibility:hidden;opacity:1!important;transform:none!important;transition:none}',
-    '.np.yt-full .np-card,.np.yt-full .np-in{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;clip-path:none!important}',
-    '.np.yt-full .np-yt .np-more{opacity:1}.np.yt-full .np-yt .np-pane[data-pane=now]{display:grid}',
+    '.np.yt-full .np-card,.np.yt-full .np-in{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;clip-path:none!important;overflow:visible}',
+    '.np.yt-full .np-yt .np-more{opacity:1;overflow:visible}.np.yt-full .np-yt .np-pane[data-pane=now]{display:grid}',
     '.np.yt-full .yt-vid{visibility:visible;position:fixed!important;z-index:5;border-radius:22px;box-shadow:0 30px 80px rgba(0,0,0,.55)}',
     '.np.dj-hide,.np-tab.dj-hide{opacity:0!important;pointer-events:none!important}',
     '/* DJ mode: the whole page, with the wallpaper still showing through */',
@@ -258,6 +260,7 @@ window.NowPlaying = (function () {
     '.np-dj button:hover{background:rgba(255,255,255,.14)}.np-dj button:active{transform:scale(.92)}.np-dj button:focus-visible{outline:2px solid var(--np-acc);outline-offset:2px}',
     '.np-dj button svg{width:22px;height:22px;fill:currentColor}',
     '.dj-top{display:flex;align-items:center;gap:12px;min-width:0}',
+    '.dj-yt-grab{display:none}',
     '.dj-tag{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;padding:7px 12px;border-radius:999px;background:rgba(10,10,20,.5);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}',
     '.dj-tag i{width:8px;height:8px;border-radius:50%;background:var(--np-acc);box-shadow:0 0 10px var(--np-acc)}.np-dj.playing .dj-tag i{animation:dj-pulse 1.6s ease-in-out infinite}',
     '@keyframes dj-pulse{50%{transform:scale(.55);opacity:.6}}',
@@ -265,6 +268,7 @@ window.NowPlaying = (function () {
     '.np-dj .dj-x,.np-dj .dj-pip{background:rgba(10,10,20,.5);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}',
     '.dj-mid{display:flex;align-items:center;justify-content:center;gap:clamp(20px,5vw,64px);min-height:0}',
     '.dj-cover{display:block;width:min(46vh,40vw,520px);aspect-ratio:1;object-fit:cover;border-radius:22px;background:rgba(255,255,255,.06);box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.08);flex:none;transition:transform .8s ease}',
+    '.dj-cover:not([src]){visibility:hidden}',
     '/* the cover as a card: it tilts toward the mouse with a sheen that follows, lifts on hover, and plays / pauses when pressed */',
     '.dj-card{position:relative;flex:none;border-radius:22px;cursor:pointer;transform:perspective(1000px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) scale(var(--cs,1));transition:transform .5s cubic-bezier(.2,.8,.2,1),filter .4s ease;will-change:transform}',
     '.dj-card.live{transition:transform .08s linear}.dj-card:hover{--cs:1.03}.dj-card:active{--cs:.98}',
@@ -432,35 +436,65 @@ window.NowPlaying = (function () {
 
     /* ---------- the API ---------- */
     var inflight = 0, waiting = [], coolUntil = 0;
+    var searchLimit = null, apiLimit = null;
     function slot() {
       return new Promise(function (res) {
-        (function go() {
-          var w = coolUntil - Date.now(); if (w > 0) { setTimeout(go, w); return; }
-          if (inflight < 3) { inflight++; res(); } else waiting.push(go);
-        })();
+        function take() { inflight++; res(); }
+        if (inflight < 3) take(); else waiting.push(take);
       });
     }
-    // when searching may happen again (kept for every wallpaper in this browser)
-    function searchRest(sec) { try { localStorage.setItem('np-search-rest', String(Date.now() + Math.max(600, sec) * 1000)); } catch (e) { } }
-    function searchResting() { var t = 0; try { t = +localStorage.getItem('np-search-rest') || 0; } catch (e) { } return t > Date.now() ? t : 0; }
-    function release() { inflight = Math.max(0, inflight - 1); var n = waiting.shift(); if (n) n(); }
-    function call(method, path, body, again, tries) {
-      tries = tries || 0;
-      return slot().then(access).then(function (a) {
-        return fetch(API + path, { method: method, headers: Object.assign({ Authorization: 'Bearer ' + a }, body ? { 'Content-Type': 'application/json' } : {}), body: body ? JSON.stringify(body) : undefined });
-      }).then(function (r) { release(); return r; }, function (e) { release(); throw e; }).then(function (r) {
-        if (r.status === 429) {
-          var ra = parseFloat(r.headers.get('Retry-After'));
-          if (/^\/search/.test(path)) {   // the search allowance is used up: no retries (they would use more); searching rests a while
-            searchRest(isFinite(ra) && ra > 0 ? ra : 600);
-            var qe = new Error('QUOTA'); qe.status = 429; qe.quota = true; throw qe;
-          }
-          if (tries < 2) {   // anything else: everything waits a moment, then this one goes again
-            ra = isFinite(ra) && ra > 0 ? Math.min(ra, 30) : 3 * (tries + 1);
-            coolUntil = Math.max(coolUntil, Date.now() + ra * 1000);
-            return call(method, path, body, again, tries + 1);
-          }
-        }
+    // Search can be limited separately from playback. Use a new key so old ten-minute delays expire with the update.
+    var searchUntil = 0, searchRetryKey = 'np-search-retry', searchQuotaKey = 'np-search-quota-until';
+    function searchResting() {
+      var t = searchUntil;
+      try { t = Math.max(t, +localStorage.getItem(searchRetryKey) || 0); } catch (e) { }
+      return t > Date.now() ? t : 0;
+    }
+    function rateError(until, search) {
+      var e = new Error('Spotify declined requests'); e.status = 429; e.retryAt = until; e.searchLimited = search;
+      e.limit = search ? searchLimit : apiLimit; return e;
+    }
+    function retryMessage(until, search, limit) {
+      var sec = Math.max(1, Math.ceil((until - Date.now()) / 1000));
+      var wait = sec < 60 ? sec + ' sec' : Math.ceil(sec / 60) + ' min';
+      var quota = limit && limit.quota;
+      if (!limit && search) try { quota = +localStorage.getItem(searchQuotaKey) > Date.now(); } catch (e) { }
+      if (quota && search && (!limit || !limit.hasRetryAfter)) return 'Spotify’s search quota is used up. The DJ can still use your library.';
+      var message = quota ? 'Spotify reported a Development Mode quota limit.' : (search ? 'Spotify search' : 'Spotify') + ' is on cooldown.';
+      if (limit && !limit.hasRetryAfter) return message + ' App pause: ' + wait + '.';
+      return message + ' Try again in ' + wait + '.';
+    }
+    function release() { inflight--; var n = waiting.shift(); if (n) n(); }
+    function call(method, path, body, again) {
+      var search = /^\/search(?:\?|$)/.test(path);
+      function checkCooldown() {
+        if (coolUntil > Date.now()) throw rateError(coolUntil, false);
+        if (search && searchResting()) throw rateError(searchResting(), true);
+      }
+      return slot().then(function () {
+        return Promise.resolve().then(checkCooldown).then(access).then(function (a) {
+          checkCooldown();
+          return fetch(API + path, { method: method, headers: Object.assign({ Authorization: 'Bearer ' + a }, body ? { 'Content-Type': 'application/json' } : {}), body: body ? JSON.stringify(body) : undefined });
+        }).then(function (r) {
+          if (r.status !== 429) return r;
+          var header = r.headers.get('Retry-After'), sec = header == null || !header.trim() ? NaN : Number(header);
+          var supplied = Number.isFinite(sec) && sec >= 0;
+          var until = Date.now() + (supplied ? sec : 30) * 1000;
+          if (search) {
+            searchUntil = Math.max(searchResting(), until);
+            try { localStorage.setItem(searchRetryKey, String(searchUntil)); } catch (e) { }
+          } else coolUntil = Math.max(coolUntil, until);
+          return r.json().catch(function () { return null; }).then(function (j) {
+            var limit = { quota: !!(j && j.error && j.error.reason === 'QUOTA_EXCEEDED'), hasRetryAfter: supplied };
+            if (search && !supplied && limit.quota) {
+              searchUntil = Math.max(searchUntil, Date.now() + 15 * 60000);
+              try { localStorage.setItem(searchRetryKey, String(searchUntil)); localStorage.setItem(searchQuotaKey, String(searchUntil)); } catch (e) { }
+            }
+            if (search) searchLimit = limit; else apiLimit = limit;
+            throw rateError(search ? searchUntil : coolUntil, search);
+          });
+        }).finally(release);
+      }).then(function (r) {
         if (r.status === 401 && !again) { var t = load(); if (t) { t.exp = 0; save(t); } tok = t; return call(method, path, body, true); }   // the access ran out early: once more with a fresh one
         if (r.status === 204 || r.status === 202) return null;
         return r.json().catch(function () { return null; }).then(function (j) {
@@ -476,8 +510,7 @@ window.NowPlaying = (function () {
       if (/PREMIUM/i.test(e.message)) return 'This needs Spotify Premium';   // Spotify says so itself (PREMIUM_REQUIRED)
       if (e.status === 403) return 'Spotify refused: ' + e.message;
       if (e.status === 404) return 'No active device: open Spotify first';
-      if (e.status === 429 && e.quota) { var mins = Math.max(1, Math.round((searchResting() - Date.now()) / 60000)); return 'Spotify\'s search allowance is used up: try again in about ' + mins + ' min'; }
-      if (e.status === 429) return 'Spotify is busy: give it a few seconds';
+      if (e.status === 429) return retryMessage(e.retryAt, e.searchLimited, e.limit);
       return e.message;
     }
 
@@ -486,7 +519,7 @@ window.NowPlaying = (function () {
     var npc = new URLSearchParams(location.search).get('npc'), box = document.createElement('div'), cor = /^(tr|tl|br|bl)$/.test(npc || '') ? npc : corner(); box.className = 'np ' + cor; box.setAttribute('role', 'region'); box.setAttribute('aria-label', 'Now playing on Spotify');
     var BANDS = [['now', 'Now'], ['queue', 'Queue'], ['search', 'Search'], ['lib', 'Library'], ['dev', 'Devices']];
     box.innerHTML = '<div class="np-card"><div class="np-in">' +
-      '<div class="np-src" hidden><span class="np-srctabs" role="tablist" aria-label="Music from" hidden><button type="button" role="tab" data-s="sp" aria-selected="true">Spotify</button><button type="button" role="tab" data-s="yt" aria-selected="false">YouTube Music</button></span>' +
+      '<div class="np-src" hidden><span class="np-srctabs" role="tablist" aria-label="Music from" hidden><button type="button" role="tab" data-s="sp" aria-selected="true">Spotify</button><button type="button" role="tab" data-s="yt" aria-selected="false">YouTube</button></span>' +
       '<button type="button" class="np-resign" title="Sign in again">' + ICON.key + 'Sign in</button></div>' +
       '<div class="np-sp"><div class="np-mini"><img class="np-art" alt=""><span class="np-lk" aria-hidden="true">' + ICON.heartOn + '</span><div class="np-txt"><b class="np-t"><span>—</span></b><span class="np-a"></span></div>' +
       '<div class="np-btns"><button type="button" class="np-prev" aria-label="Previous">' + ICON.prev + '</button><button type="button" class="np-play" aria-label="Pause">' + ICON.pause + '</button>' +
@@ -502,20 +535,23 @@ window.NowPlaying = (function () {
       '<button type="button" class="np-tog np-rep" aria-label="Repeat: off">' + ICON.repeat + '</button>' +
       '<button type="button" class="np-tog np-like" aria-label="Save to your library" aria-pressed="false">' + ICON.heart + '</button></div>' +
       '<label class="np-vol np-ctl">' + ICON.vol + '<input type="range" class="np-volr" min="0" max="100" value="50" aria-label="Volume"></label>' +
-      '<p class="np-note"></p><div class="np-foot"><span class="np-dev"></span><a class="np-link" target="_blank" rel="noopener">Open in Spotify ↗</a></div><div class="np-acts np-shares" hidden><button type="button" class="np-share">' + ICON.share + 'Share to Discord</button></div></section>' +
+      '<p class="np-note"></p><div class="np-foot"><button type="button" class="np-dev">Choose a device</button><a class="np-link" target="_blank" rel="noopener">Open in Spotify ↗</a></div><div class="np-acts np-shares" hidden><button type="button" class="np-share">' + ICON.share + 'Share to Discord</button></div></section>' +
       '<section class="np-pane" data-pane="queue" role="tabpanel" aria-label="Queue"><ul class="np-list np-ql"></ul></section>' +
-      '<section class="np-pane" data-pane="search" role="tabpanel" aria-label="Search"><input type="search" class="np-q" placeholder="Songs, artists, albums…" aria-label="Search Spotify" autocomplete="off" spellcheck="false"><ul class="np-list np-sl"></ul></section>' +
+      '<section class="np-pane" data-pane="search" role="tabpanel" aria-label="Search"><form class="np-gform np-searchform"><input type="search" class="np-q" placeholder="Songs, artists, albums…" aria-label="Search Spotify" autocomplete="off" spellcheck="false"><button type="submit">Search</button></form><ul class="np-list np-sl"></ul></section>' +
       '<section class="np-pane" data-pane="lib" role="tabpanel" aria-label="Library"><div class="np-chips np-lsub"><button type="button" data-l="pl" aria-pressed="true">Playlists</button><button type="button" data-l="liked" aria-pressed="false">Liked</button><button type="button" data-l="recent" aria-pressed="false">Recent</button><button type="button" data-l="tt" aria-pressed="false">Top songs</button><button type="button" data-l="ta" aria-pressed="false">Top artists</button></div>' +
       '<div class="np-chips np-lrange" hidden><button type="button" data-r="short_term" aria-pressed="true">4 weeks</button><button type="button" data-r="medium_term" aria-pressed="false">6 months</button><button type="button" data-r="long_term" aria-pressed="false">All time</button></div><ul class="np-list np-ll"></ul></section>' +
       '<section class="np-pane" data-pane="dev" role="tabpanel" aria-label="Devices"><ul class="np-list np-dl"></ul>' +
+      '<div class="np-foot"><button type="button" class="np-devrefresh">Refresh devices</button><a class="np-link" href="https://open.spotify.com" target="_blank" rel="noopener">Open Spotify on this computer ↗</a></div>' +
+      (opts.app ? '<p class="np-note">To play through this computer’s audio, open the Spotify desktop app or web player on the same account, refresh, and select it here.</p>' : '') +
       '<label class="np-here"><input type="checkbox" class="np-herecb"><span><b>Play on this wallpaper</b><small>Makes this page a Spotify speaker you can pick from your phone. Premium only.</small></span></label>' +
       '<label class="np-here"><input type="checkbox" class="np-keepcb"><span><b>Keep the music here</b><small>Every 5 seconds, if another device has the music, this wallpaper takes it back (playing or paused, as it was).</small></span></label><p class="np-herenote" aria-live="polite"></p></section>' +
       '</div></div><div class="np-yt"></div></div></div>';
     document.body.appendChild(box);
-    var spEl = box.querySelector('.np-sp');   // Spotify's part of the card (YouTube Music has its own, in the same layout)
+    var spEl = box.querySelector('.np-sp');   // Spotify's part of the card (YouTube has its own, in the same layout)
     function $(c) { return spEl.querySelector(c); }
     function $$(c) { return Array.prototype.slice.call(spEl.querySelectorAll(c)); }
     var S = null, at = 0, lastPlay = 0, art = '', liked = null, lastId = null, hold = 0, timer = null, busy = false, pane = 'now';
+    var selectedDevice = null, deviceSettlesAt = 0;
 
     function setTitle(text) {
       var b = $('.np-t'), sp = b.firstChild; if (sp.textContent === text) return;
@@ -552,13 +588,14 @@ window.NowPlaying = (function () {
       if (mode === idleMode) { if (mode) show(); return; }
       idleMode = mode; box.classList.toggle('np-idle', !!mode);
       if (!mode) { art = ''; return; }
-      setBig(false); art = NOTE; $('.np-art').src = NOTE;
+      if (!opts.app) setBig(false);
+      art = NOTE; $('.np-art').src = NOTE;
       setTitle(mode === 'connect' ? 'Spotify' : 'Nothing playing');
       $('.np-a').textContent = mode === 'connect' ? (LIVELY ? 'Connect from your PC\'s browser: click for how' : 'Connect to show what is playing') : 'Play something on Spotify';
       show();
     }
     box.addEventListener('click', function (e) {   // a quiet card: click to connect, or to open Spotify
-      if (src === 'yt' || e.target.closest('.np-src')) return;
+      if (src === 'yt' || e.target.closest('.np-src,.np-more')) return;
       if (here && here.activateElement) try { here.activateElement(); } catch (er) { }   // lets the wallpaper speaker play sound (browsers want a click first)
       if (!idleMode || e.target.closest('button')) return;
       if (idleMode === 'connect' && LIVELY) {   // a wallpaper cannot be typed into: point to the Spotify page on the PC, and copy its address
@@ -586,7 +623,7 @@ window.NowPlaying = (function () {
       $('.np-shuf').classList.toggle('on', !!S.shuffle_state); $('.np-shuf').setAttribute('aria-pressed', String(!!S.shuffle_state));
       $('.np-rep').classList.toggle('on', S.repeat_state !== 'off'); $('.np-rep').setAttribute('aria-label', 'Repeat: ' + (S.repeat_state === 'track' ? 'this track' : S.repeat_state === 'context' ? 'on' : 'off'));
       $('.np-rep').style.opacity = S.repeat_state === 'track' ? '1' : '';
-      $('.np-dev').textContent = S.device ? 'On ' + S.device.name : '';
+      $('.np-dev').textContent = S.device ? 'On ' + S.device.name + ' · Change' : 'Choose a device';
       if (S.device && document.activeElement !== $('.np-volr') && S.device.volume_percent != null) $('.np-volr').value = S.device.volume_percent;
       $('.np-link').href = it.external_urls ? it.external_urls.spotify : 'https://open.spotify.com';
       $('.np-dur').textContent = fmt(it.duration_ms);
@@ -606,7 +643,11 @@ window.NowPlaying = (function () {
       } : { source: 'spotify', playing: false } }));
     }
     function currentTrack() { var it = S && S.item; if (!it) return null; lastEmit = null; var d = null; window.addEventListener('np:track', function f(e) { d = e.detail; window.removeEventListener('np:track', f); }); emitTrack(); return d; }
-    function tick() {   // the position, moved on locally between polls
+    var tickAt = 0;
+    function tick(now) {   // the position, moved on locally between polls: every frame in the full view, four times a second otherwise
+      requestAnimationFrame(tick);
+      if ((document.hidden && !pipWin) || (!djOpen && now - tickAt < 250)) return;
+      tickAt = now;
       if (S && S.item) {
         var pos = Math.min(S.item.duration_ms, S.progress_ms + (S.is_playing ? Date.now() - at : 0)), f = pos / S.item.duration_ms, pc = (f * 100).toFixed(2) + '%';
         $('.np-line i').style.width = pc;
@@ -614,7 +655,6 @@ window.NowPlaying = (function () {
         if (djOpen) { djQ('.dj-bar i').style.width = pc; djQ('.dj-cur').textContent = fmt(pos); }
         if (pipWin) pipWin.document.querySelector('.bar i').style.width = pc;
       }
-      requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
     function tint(url) {   // the card takes a colour from the cover (if the image allows it); a skin keeps its own
@@ -634,15 +674,17 @@ window.NowPlaying = (function () {
     /* ---------- polling ---------- */
     // Each page asks Spotify what is playing; the answer is shared through this browser's storage, so another page that
     // asked a moment ago (and after our last button press) saves this one a request: three open pages cost about one.
-    var pollWho = rand(8), lastAction = 0;
+    var pollWho = rand(8), lastAction = 0, polling = false, panelActive = false, lagged = false, lastRaw = null;
     function shared() { try { var x = JSON.parse(localStorage.getItem('np-shared') || 'null'); return x && x.t ? x : null; } catch (e) { return null; } }
     function hereActive() { return !!(hereId && S && S.device && S.device.id === hereId); }
     function gap() {
       if (!tok) return 10000;
-      if (S && S.is_playing) return hereActive() ? 15000 : (box.classList.contains('big') || djOpen || keepHere ? 3000 : 5000);   // playing here: the speaker itself reports changes
+      if (opts.app && !panelActive) return S && S.is_playing ? 15000 : 30000;
+      if (S && S.is_playing) return hereActive() ? 15000 : (box.classList.contains('big') || djOpen || keepHere ? 5000 : 8000);   // playing here: the speaker itself reports changes
       return S && S.item ? 6000 : 12000;
     }
     function poll() {
+      if (polling) return;
       clearTimeout(timer);
       tok = load() || tok;
       if (!enabled || !tok || document.hidden) {
@@ -650,12 +692,26 @@ window.NowPlaying = (function () {
         if (enabled && !tok && SITE) setIdle('connect');   // on the website, signed out: a card to connect
         timer = setTimeout(poll, 4000); return;
       }
-      var sh = shared(), ask = sh && sh.who !== pollWho && sh.t > lastAction && Date.now() - sh.t < 2500
+      polling = true;
+      var requestedAt = Date.now(), sh = shared(), ask = sh && sh.who !== pollWho && sh.t > lastAction && Date.now() - sh.t < 2500
         ? Promise.resolve(sh.S)
         : call('GET', '/me/player?additional_types=episode').then(function (j) { try { localStorage.setItem('np-shared', JSON.stringify({ t: Date.now(), who: pollWho, S: j })); } catch (e) { } return j; });
       ask.then(function (j) {
-        if (Date.now() < hold) return;   // a control was just pressed: let its result settle first
+        if (busy || requestedAt < lastAction || Date.now() < hold) return;   // a control was just pressed: let its result settle first
+        var was = S && S.item && S.is_playing && j && j.item && j.is_playing && S.item.id === j.item.id ? S.progress_ms + (Date.now() - at) : null;
+        var raw = j && j.item ? j.item.id + '@' + j.progress_ms : null, stale = raw && raw === lastRaw;
+        lastRaw = raw;
         S = j; at = Date.now();
+        // Spotify's position can be behind. A device that has stopped reporting (the Web Player in a background browser tab)
+        // leaves Spotify repeating the very same position while "playing": that answer says nothing new, so the clock keeps
+        // counting. And an answer a few seconds old (or a shared one, up to 2.5 s old) would make the time jump back and
+        // forward again: a step back on one answer is lag and the clock keeps counting; if the next answer says the same,
+        // it was a real rewind (from another device) and it is taken.
+        var back = was == null ? 0 : was - j.progress_ms, dur = j.item && j.item.duration_ms || Infinity;
+        if (was != null && stale) { S.progress_ms = Math.min(was, dur); lagged = false; }
+        else if (back > 0 && back < 12000 && !(back > 1500 && lagged)) { S.progress_ms = Math.min(was, dur); lagged = back > 1500; }
+        else lagged = false;
+        if (j && j.device && j.device.id && (j.device.id === (selectedDevice && selectedDevice.id) || Date.now() >= deviceSettlesAt)) selectedDevice = null;
         if (j && j.item && j.is_playing) lastPlay = Date.now();
         setStatus(j && j.item ? (j.is_playing ? 'playing' : 'paused') : 'idle');
         djPaint(); djKeepGoing(); if (keepHere) grabCheck();
@@ -664,9 +720,10 @@ window.NowPlaying = (function () {
         else hide();   // as a wallpaper, paused for 30 s or stopped: tuck away
       }).catch(function (e) {
         if (/signed out|invalid_grant|refresh token/i.test(e.message)) { tok = null; save(null); hide(); setStatus('off', 'Signed out. Connect again.'); return; }
-        setStatus('error', e.message);
-      }).then(function () {
-        timer = setTimeout(poll, gap());
+        setStatus('error', why(e));
+      }).finally(function () {
+        polling = false;
+        timer = setTimeout(poll, Math.min(2147483647, Math.max(gap(), coolUntil - Date.now())));
       });
     }
     document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
@@ -685,7 +742,7 @@ window.NowPlaying = (function () {
       call(method, path).then(function () { note = ''; }).catch(function (e) {
         note = why(e);
         paint(); flash(note);
-      }).then(function () { busy = false; setTimeout(function () { hold = 0; poll(); }, 250); setTimeout(poll, 1200); });
+      }).then(function () { busy = false; setTimeout(function () { hold = 0; poll(); }, 650); });
     }
     $('.np-play').addEventListener('click', function () {
       if (!S) return; var playing = S.is_playing;
@@ -710,7 +767,7 @@ window.NowPlaying = (function () {
     }
     $('.np-wide').addEventListener('click', function () { setWide(!box.classList.contains('wide'), true); });
     var src = 'sp', yt = null;
-    // sign in again: Spotify through its sign-in page (the whole tab, even from inside the rotation), or Google for YouTube Music
+    // sign in again: Spotify through its sign-in page (the whole tab, even from inside the rotation), or Google for YouTube
     // shown on every page: the website's "As a wallpaper" pages use the same ?wallpaper address as Lively, so they cannot be told apart
     box.querySelector('.np-src').hidden = false;
     box.querySelector('.np-resign').addEventListener('click', function () {
@@ -722,14 +779,15 @@ window.NowPlaying = (function () {
       w.location.href = SETUP + '?signin=1&back=' + encodeURIComponent(w.location.href);
     });
     try { setWide(localStorage.getItem('np-wide') === '1'); } catch (e) { setWide(false); }
-    /* the source: Spotify, or YouTube Music (a tab in the same card, when ytmusic.js is on the page) */
+    /* the source: Spotify, or YouTube (a tab in the same card, when ytmusic.js is on the page) */
     function setSrc(s2, keep) {
+      var changed = src !== s2;
       src = s2; box.classList.toggle('src-yt', s2 === 'yt');
       Array.prototype.forEach.call(box.querySelectorAll('.np-srctabs button'), function (b) { b.setAttribute('aria-selected', String(b.getAttribute('data-s') === s2)); });
-      box.setAttribute('aria-label', s2 === 'yt' ? 'YouTube Music' : 'Now playing on Spotify');
+      box.setAttribute('aria-label', s2 === 'yt' ? 'YouTube' : 'Now playing on Spotify');
       if (keep) try { localStorage.setItem('np-src', s2); } catch (e) { }
       if (s2 === 'yt') { if (enabled) show(); if (yt) { yt.sync(); yt.fill(); } }
-      else { if (box.classList.contains('big')) { checkLiked(); fill(pane); } poll(); }
+      else if (changed || !opts.app) { if (box.classList.contains('big')) { checkLiked(); fill(pane); } poll(); }
     }
     if (window.YTMusic && window.YTMusic.mount) {
       yt = window.YTMusic.mount(box.querySelector('.np-yt'), {
@@ -737,7 +795,7 @@ window.NowPlaying = (function () {
         toggleWide: function () { setWide(!box.classList.contains('wide'), true); }, isWide: function () { return box.classList.contains('wide'); },
         pauseOther: function () { if (S && S.is_playing) ctl('PUT', '/me/player/pause', function () { S.progress_ms += Date.now() - at; at = Date.now(); S.is_playing = false; }); },   // YouTube started: Spotify pauses
         canPip: !!PIPW, pipHost: PIPW,
-        openFull: function () { setView('yt'); }, onChange: function () { if (view === 'yt') djPaint(); }
+        openFull: function () { setView('yt'); }, closeFull: function () { if (view === 'yt') setView(null, true); }, onChange: function () { if (view === 'yt') djPaint(); }
       });
       box.querySelector('.np-srctabs').hidden = false;
       Array.prototype.forEach.call(box.querySelectorAll('.np-srctabs button'), function (b) { b.addEventListener('click', function () { setSrc(b.getAttribute('data-s'), true); }); });
@@ -803,16 +861,22 @@ window.NowPlaying = (function () {
 
     /* ---------- playing anything: a song, an album, a playlist, an artist ---------- */
     function play(body, label) {
+      if (busy) { flash('Wait for the current Spotify control to finish.'); return Promise.resolve(false); }
+      busy = true;
       hold = Date.now() + 1500; lastAction = Date.now();
-      return call('PUT', '/me/player/play', body).catch(function (e) {
-        if (e.status !== 404) throw e;   // nothing active: start it on a device that is around (this wallpaper first, if it is a speaker)
+      var chosen = selectedDevice, target = chosen || (S && S.device && !S.device.is_restricted ? S.device : null);
+      function startOn(d) { return call('PUT', '/me/player/play' + (d && d.id ? '?device_id=' + encodeURIComponent(d.id) : ''), body); }
+      return startOn(target).catch(function (e) {
+        if (e.status !== 404) throw e;
+        if (chosen) { selectedDevice = null; throw new Error(chosen.name + ' is unavailable. Choose a device again.'); }
         return call('GET', '/me/player/devices').then(function (j) {
-          var ds = (j && j.devices || []).filter(function (d) { return !d.is_restricted; }), d = ds.filter(function (x) { return x.id === hereId; })[0] || ds[0];
-          if (!d) throw e;
-          return call('PUT', '/me/player/play?device_id=' + encodeURIComponent(d.id), body);
+          var ds = (j && j.devices || []).filter(function (d) { return d.id && !d.is_restricted; });
+          var d = ds.find(function (x) { return x.is_active || x.id === hereId; }) || (ds.length === 1 ? ds[0] : null);
+          if (!d || (target && d.id === target.id)) throw new Error('Choose an available Spotify player in Devices, then try again.');
+          return startOn(d);
         });
-      }).then(function () { flash('Playing ' + label, true); setTimeout(function () { hold = 0; poll(); }, 300); setTimeout(poll, 1300); return true; },
-        function (e) { hold = 0; flash(why(e)); return false; });
+      }).then(function () { flash('Playing ' + label, true); setTimeout(function () { hold = 0; poll(); }, 900); return true; },
+        function (e) { hold = 0; flash(why(e)); return false; }).finally(function () { busy = false; });
     }
     var addedQ = {}, addedPl = {};   // songs added this visit: to the queue, and to a playlist (its name)
     function enqueue(uri, label) {
@@ -857,24 +921,47 @@ window.NowPlaying = (function () {
         return ok;
       });
     }
+    function playlistPage(id, offset) {
+      var path = '/playlists/' + encodeURIComponent(id), query = '?limit=50&offset=' + offset;
+      return call('GET', path + '/items' + query).catch(function (e) {
+        if (e.status !== 404 && e.status !== 405) throw e;
+        return call('GET', path + '/tracks' + query);
+      });
+    }
     function openColl(e, c) {
       if (!c.uri && c.id) c.uri = 'spotify:' + c.kind + ':' + c.id;
       var ul = e && e.currentTarget && e.currentTarget.closest('ul'); if (!ul) { playColl(c); return; }
       var keep = document.createDocumentFragment(), top = ul.scrollTop; while (ul.firstChild) keep.appendChild(ul.firstChild);
       function back() { ul.textContent = ''; ul.appendChild(keep); ul.scrollTop = top; }
       var bar = { bar: c.name, back: back, acts: [['Play', ICON.play, function () { playColl(c); }], ['Shuffle', ICON.shuffle, function () { playColl(c, true); }], ['Full view', ICON.full, function () { playColl(c).then(function (ok) { if (ok) openNow(c.name); }); }]] };
-      list(ul, [bar, { empty: 'Loading the songs…' }]); ul.scrollTop = 0;
-      var job = c.kind === 'album'
-        ? call('GET', '/albums/' + c.id + '/tracks?limit=50').then(function (j) { return (j && j.items || []).map(function (t) { t.album = t.album || { uri: c.uri, images: c.images, name: c.name }; return t; }); })
-        : call('GET', '/playlists/' + c.id + '/items?limit=100').catch(function (er) { if (er.status === 401 || er.status === 429) throw er; return call('GET', '/playlists/' + c.id + '/tracks?limit=100'); })
-          .then(function (j) { return (j && j.items || []).map(function (x) { return x && (x.item || x.track); }); });
-      job.then(function (ts) {
-        ts = ts.filter(function (t) { return t && t.uri && t.type !== 'episode'; }); if (ts.length && !c.n) c.n = ts.length;
-        var ctx = { context: c.uri, label: c.name };
-        list(ul, [bar].concat(ts.length ? ts.map(function (t) { return asTrack(t, 0, null, ctx); }) : [{ empty: 'No songs here yet.' }]));
-      }, function (er) {
-        list(ul, [bar, { empty: er.status === 403 || er.status === 404 ? 'Spotify only lets this app look inside your own playlists. Play and Shuffle still work.' : why(er) }]);
-      });
+      var tracks = [], ctx = { context: c.uri, label: c.name }, detail;
+      function draw(extra, scroll) {
+        list(ul, [bar].concat(tracks.map(function (t) { return asTrack(t, 0, null, ctx); }), extra));
+        detail = ul.firstChild; ul.scrollTop = scroll;
+      }
+      function loadPage(offset) {
+        var scroll = offset ? ul.scrollTop : 0;
+        draw([{ empty: 'Loading tracks…' }], scroll);
+        var job = c.kind === 'album' ? call('GET', '/albums/' + encodeURIComponent(c.id) + '/tracks?limit=50&offset=' + offset) : playlistPage(c.id, offset);
+        job.then(function (page) {
+          if (ul.firstChild !== detail) return;
+          var songs = (page && page.items || []).map(function (entry) {
+            if (c.kind !== 'album') return entry && (entry.item || entry.track);
+            return entry && Object.assign({ album: { uri: c.uri, images: c.images, name: c.name } }, entry);
+          });
+          tracks = tracks.concat(songs.filter(function (t) { return t && t.uri && t.type !== 'episode'; }));
+          if (page && page.total != null) c.n = page.total;
+          var extra = [];
+          if (page && page.next) extra.push({ t: 'More tracks', icon: ICON.open, verb: 'Load', go: function () { loadPage(offset + (page.limit || 50)); } });
+          else if (!tracks.length) extra.push({ empty: 'No tracks here yet.' });
+          draw(extra, scroll);
+        }, function (er) {
+          if (ul.firstChild !== detail) return;
+          var restricted = c.kind === 'playlist' && er.status === 403 && !/scope/i.test(er.message);
+          draw([restricted ? { empty: 'Spotify lets this app browse playlists you own or collaborate on.', href: 'https://open.spotify.com/playlist/' + encodeURIComponent(c.id) } : { empty: why(er) }], scroll);
+        });
+      }
+      loadPage(0);
     }
 
     // a list: rows to press (play, or move to a device), a + to queue a song, headings, and a line for when it is empty
@@ -893,6 +980,7 @@ window.NowPlaying = (function () {
         if (r.empty != null) {
           li.className = 'np-empty'; li.textContent = r.empty;
           if (r.signin) { li.appendChild(document.createTextNode(' ')); var a = el('a', null, 'Spotify page ↗'); a.href = SETUP + '?back=' + encodeURIComponent(location.href); a.target = '_top'; li.appendChild(a); }
+          if (r.href) { li.appendChild(document.createTextNode(' ')); var link = el('a', null, 'Open in Spotify ↗'); link.href = r.href; link.target = '_blank'; link.rel = 'noopener'; li.appendChild(link); }
           ul.appendChild(li); return;
         }
         var b = el(r.go ? 'button' : 'div', 'np-item' + (r.on ? ' on' : '') + (r.verb === 'Open' ? ' np-open' : ''));
@@ -919,6 +1007,8 @@ window.NowPlaying = (function () {
       $$('.np-pane').forEach(function (s) { s.classList.toggle('on', s.getAttribute('data-pane') === p); });
       fill(p);
     }
+    $('.np-dev').addEventListener('click', function () { setPane('dev', true); });
+    $('.np-devrefresh').addEventListener('click', fillDev);
     $$('.np-bands button').forEach(function (b, i, all) {
       b.addEventListener('click', function () { setPane(b.getAttribute('data-p')); });
       b.addEventListener('keydown', function (e) {
@@ -966,29 +1056,24 @@ window.NowPlaying = (function () {
       }, function (e) { if (ok()) failed(ul, e); });
     }
 
-    // Search: songs, artists, albums and playlists as you type; Enter plays the top song
-    var sq = 0, top = null;
-    $('.np-q').addEventListener('input', function () {
-      var q = this.value.trim(); clearTimeout(sq);
-      if (q.length < 2) { top = null; fill('search'); return; }
-      sq = setTimeout(function () {
-        var ok = fresh('search'), ul = $('.np-sl');
-        call('GET', '/search?type=track,artist,album,playlist&limit=5&q=' + encodeURIComponent(q)).then(function (j) {
-          if (!ok()) return; j = j || {};
-          var tr = (j.tracks && j.tracks.items || []).filter(Boolean), ars = (j.artists && j.artists.items || []).filter(Boolean),
-            als = (j.albums && j.albums.items || []).filter(Boolean), pls = (j.playlists && j.playlists.items || []).filter(Boolean);
-          top = tr[0] || null;
-          var rows = [];
-          if (tr.length) rows = rows.concat([{ head: 'Songs' }], tr.map(function (t) { return asTrack(t, 0, null, { album: true, label: t.album && t.album.name }); }));
-          if (ars.length) rows = rows.concat([{ head: 'Artists' }], ars.slice(0, 3).map(asArtist));
-          if (als.length) rows = rows.concat([{ head: 'Albums' }], als.slice(0, 3).map(asAlbum));
-          if (pls.length) rows = rows.concat([{ head: 'Playlists' }], pls.slice(0, 3).map(asList));
-          rows.unshift({ t: 'DJ mode: play “' + q + '”', s: 'New ' + q + ' songs, and it carries on by itself', icon: ICON.dj, verb: 'Start', go: function () { dj.g = q.toLowerCase(); djEnter(true); } });
-          list(ul, rows);
-        }, function (e) { if (ok()) failed(ul, e); });
-      }, 600);
+    // Submit one search for songs, artists, albums and playlists.
+    $('.np-searchform').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var q = $('.np-q').value.trim(), ok = fresh('search'), ul = $('.np-sl');
+      if (q.length < 2) { fill('search'); return; }
+      call('GET', '/search?type=track,artist,album,playlist&limit=5&q=' + encodeURIComponent(q)).then(function (j) {
+        if (!ok()) return; j = j || {};
+        var tr = (j.tracks && j.tracks.items || []).filter(Boolean), ars = (j.artists && j.artists.items || []).filter(Boolean),
+          als = (j.albums && j.albums.items || []).filter(Boolean), pls = (j.playlists && j.playlists.items || []).filter(Boolean);
+        var rows = [];
+        if (tr.length) rows = rows.concat([{ head: 'Songs' }], tr.map(function (t) { return asTrack(t, 0, null, { album: true, label: t.album && t.album.name }); }));
+        if (ars.length) rows = rows.concat([{ head: 'Artists' }], ars.slice(0, 3).map(asArtist));
+        if (als.length) rows = rows.concat([{ head: 'Albums' }], als.slice(0, 3).map(asAlbum));
+        if (pls.length) rows = rows.concat([{ head: 'Playlists' }], pls.slice(0, 3).map(asList));
+        rows.unshift({ t: 'DJ mode: play “' + q + '”', s: 'New ' + q + ' songs, and it carries on by itself', icon: ICON.dj, verb: 'Start', go: function () { dj.g = q.toLowerCase(); djEnter(true); } });
+        list(ul, rows);
+      }, function (e) { if (ok()) failed(ul, e); });
     });
-    $('.np-q').addEventListener('keydown', function (e) { if (e.key === 'Enter' && top) { e.preventDefault(); play({ uris: [top.uri] }, top.name); } });
 
     /* ---------- Explore: fresh songs and recommended playlists, picked by tapping (a wallpaper has no keyboard) ---------- */
     var GENRES = [['foryou', 'From my playlists'], ['pop', 'Pop'], ['indie', 'Indie'], ['hip hop', 'Hip hop'], ['r&b', 'R&B'], ['rock', 'Rock'], ['electronic', 'Electronic'],
@@ -1019,23 +1104,22 @@ window.NowPlaying = (function () {
       if (tasteP) return tasteP;
       try { var c = JSON.parse(localStorage.getItem('np-dj-taste') || 'null'); if (c && Date.now() - c.t < 12 * 3600e3) return (tasteP = Promise.resolve(c)); } catch (e) { }
       function items(id) {   // newer apps read /items, older ones /tracks
-        return call('GET', '/playlists/' + id + '/items?limit=50').catch(function (e) { if (e.status !== 404 && e.status !== 405) throw e; return call('GET', '/playlists/' + id + '/tracks?limit=50'); })
-          .then(function (j) { return (j && j.items || []).map(function (x) { return x && (x.item || x.track); }).filter(function (t) { return t && t.type !== 'episode'; }); }, function () { return []; });
+        return playlistPage(id, 0)
+          .then(function (j) { return (j && j.items || []).map(function (x) { return x && (x.item || x.track); }).filter(djPlayable); }, function (e) { if (e.status === 429) throw e; return []; });
       }
       tasteP = Promise.all([me(), call('GET', '/me/playlists?limit=50')]).then(function (r) {
-        var mine = (r[1] && r[1].items || []).filter(function (p) { return p && p.id && (p.collaborative || (p.owner && r[0] && p.owner.id === r[0].id)); }).slice(0, 4);
+        var mine = (r[1] && r[1].items || []).filter(function (p) { return p && p.id && (p.collaborative || (p.owner && r[0] && p.owner.id === r[0].id)); }).slice(0, 2);
         return Promise.all(mine.map(function (p) { return items(p.id); }));
       }).then(function (lists) {
         var count = {}, info = {};
         try { localStorage.setItem('np-dj-own', JSON.stringify(shuffle([].concat.apply([], lists).filter(function (t) { return t && t.id && t.uri; })).slice(0, 150).map(slim))); } catch (e) { }
         [].concat.apply([], lists).forEach(function (t) { (t.artists || []).slice(0, 2).forEach(function (a) { if (!a.id) return; count[a.id] = (count[a.id] || 0) + 1; info[a.id] = a.name; }); });
         var ids = Object.keys(count).sort(function (a, b) { return count[b] - count[a]; });
-        return Promise.all([Promise.all(ids.slice(0, 8).map(function (id) { return get('/artists/' + id).catch(function () { return null; }); })), topArtists()]).then(function (r) {
+        return topArtists().then(function (artists) {
           var gc = {};
-          r[0].forEach(function (a) { if (a) (a.genres || []).forEach(function (g) { gc[g] = (gc[g] || 0) + (count[a.id] || 1); }); });
-          r[1].forEach(function (a) { (a.genres || []).forEach(function (g) { gc[g] = (gc[g] || 0) + 1; }); });
+          artists.forEach(function (a) { (a.genres || []).forEach(function (g) { gc[g] = (gc[g] || 0) + (count[a.id] || 1); }); });
           var t = { t: Date.now(), genres: Object.keys(gc).sort(function (a, b) { return gc[b] - gc[a]; }).slice(0, 12), artists: ids.slice(0, 20).map(function (id) { return info[id]; }) };
-          if (!t.artists.length) t.artists = r[1].map(function (a) { return a.name; });
+          if (!t.artists.length) t.artists = artists.map(function (a) { return a.name; });
           try { localStorage.setItem('np-dj-taste', JSON.stringify(t)); } catch (e) { }
           return t;
         });
@@ -1043,17 +1127,18 @@ window.NowPlaying = (function () {
       return tasteP;
     }
     // a song, kept small (for the pools in this browser)
+    function djPlayable(t) { return t && t.id && /^spotify:track:[a-z0-9]+$/i.test(t.uri) && !t.is_local && t.is_playable !== false && !(t.restrictions && t.restrictions.reason); }
     function slim(t) { return { id: t.id, uri: t.uri, name: t.name, type: 'track', artists: (t.artists || []).map(function (a) { return { name: a.name, id: a.id }; }), album: t.album ? { name: t.album.name, uri: t.album.uri, release_date: t.album.release_date, images: (t.album.images || []).slice(0, 2) } : null }; }
     // Each search brings ten songs into a pool for that search (kept 6 hours); the DJ draws from the pools and only
     // searches again, for the next page, when a pool has nothing new left. So a batch of songs costs one search or none.
-    var POOLK = 'np-dj-pools';
+    var POOLK = 'np-dj-playable-pools';
     function pools() { try { var p = JSON.parse(localStorage.getItem(POOLK) || '{}'); return p && typeof p === 'object' ? p : {}; } catch (e) { return {}; } }
     function poolsSave(p) {
       var keys = Object.keys(p).sort(function (a, b) { return p[b].t - p[a].t; });
       keys.slice(12).forEach(function (k) { delete p[k]; });   // the twelve most recent searches
       try { localStorage.setItem(POOLK, JSON.stringify(p)); } catch (e) { try { localStorage.removeItem(POOLK); } catch (er) { } }
     }
-    function fresh2(items) { var seen = seenGet(); return items.filter(function (t) { return seen.indexOf(t.id) < 0; }); }
+    function fresh2(items) { var seen = seenGet(), current = S && S.item && S.item.id; return items.filter(function (t) { return t.id !== current && seen.indexOf(t.id) < 0; }); }
     function searchTracks(q, want) {
       want = want || 6;
       var p = pools(), pool = p[q];
@@ -1062,14 +1147,14 @@ window.NowPlaying = (function () {
       if (have.length >= want || (pool && pool.done) || searchResting()) return Promise.resolve(have);
       var page = pool ? pool.pages : 0;
       return call('GET', '/search?type=track&limit=10&offset=' + page * 10 + '&q=' + encodeURIComponent(q)).then(function (j) {
-        var got = (j && j.tracks && j.tracks.items || []).filter(function (t) { return t && t.id && t.uri; }).map(slim);
+        var tracks = j && j.tracks, got = (tracks && tracks.items || []).filter(djPlayable).map(slim);
         p = pools(); var cur = p[q] && Date.now() - p[q].t < 6 * 3600e3 ? p[q] : { items: [], pages: 0 };
         var ids = {}; cur.items.forEach(function (t) { ids[t.id] = 1; });
         cur.items = cur.items.concat(got.filter(function (t) { return !ids[t.id]; })).slice(-80);
-        cur.pages = (cur.pages || 0) + 1; cur.t = Date.now(); cur.done = got.length < 10 || cur.pages >= 10;
+        cur.pages = (cur.pages || 0) + 1; cur.t = Date.now(); cur.done = !(tracks && tracks.next) || cur.pages >= 10;
         p[q] = cur; poolsSave(p);
         return fresh2(cur.items);
-      }, function (e) { if (e.quota) return have; throw e; });
+      }, function (e) { if (e.searchLimited) return have; throw e; });
     }
     function genreTracks(g, e, want) {   // Spotify's genre filter; the plain words only if that finds nothing at all
       var yr = era(e)[2] ? ' year:' + era(e)[2] : '';
@@ -1097,13 +1182,18 @@ window.NowPlaying = (function () {
       } else { reason = ''; job = genreTracks(g, e, n).then(function (a) { return [a]; }); }
       return job.then(function (lists) {
         var seen = seenGet(), ids = {}, out = [];
-        shuffle([].concat.apply([], lists)).forEach(function (t) { if (t && t.id && !ids[t.id] && seen.indexOf(t.id) < 0) { ids[t.id] = 1; out.push(t); } });
+        shuffle([].concat.apply([], lists)).forEach(function (t) { if (djPlayable(t) && !ids[t.id] && seen.indexOf(t.id) < 0) { ids[t.id] = 1; out.push(t); } });
         if (out.length < Math.min(3, n) && searchResting()) {   // searching rests: songs from your own playlists keep the music going
           var own = []; try { own = JSON.parse(localStorage.getItem('np-dj-own') || '[]'); } catch (er) { }
-          own = shuffle(own.filter(function (t) { return t && t.id && !ids[t.id]; }));
+          own = shuffle(fresh2(own.filter(function (t) { return djPlayable(t) && !ids[t.id]; })));
           if (own.length) { reason = 'from your playlists while Spotify\'s search rests'; out = out.concat(own); }
         }
-        if (!out.length) return out;
+        if (!out.length && searchResting()) return get('/me/top/tracks?limit=20&time_range=medium_term').then(function (j) {
+          var tracks = fresh2((j && j.items || []).filter(djPlayable));
+          if (tracks.length) reason = 'from your top tracks while Spotify\'s search rests';
+          return shuffle(tracks);
+        }, function (e) { if (e.status === 429) throw e; return out; });
+        if (!out.length || searchResting()) return out;
         return libHas(out.slice(0, 50).map(function (t) { return t.id; })).then(function (has) {
           var left = out.filter(function (t, i) { return !(has && has[i]) || reason.indexOf('while') >= 0; }); return left.length ? left : out;
         }, function () { return out; });
@@ -1203,10 +1293,11 @@ window.NowPlaying = (function () {
       '<button type="button" class="dj-play" aria-label="Play">' + ICON.play + '</button><button type="button" class="dj-next" aria-label="Next">' + ICON.next + '</button>' +
       '<button type="button" class="dj-save" aria-label="Add to a playlist" title="Add to a playlist">' + ICON.save + '</button></div><p class="dj-toast" aria-live="polite"></p></div></div>' +
       '<div class="dj-bot"><div class="dj-vibe2"><select class="np-sel dj-g" aria-label="Genre"></select><select class="np-sel dj-e" aria-label="Era"></select>' +
-      '<form class="np-gform dj-f"><input type="search" class="np-q" placeholder="Type a genre…" aria-label="Type a genre for the DJ" autocomplete="off" spellcheck="false"><button type="submit">Play</button></form></div><div class="dj-upnext"><span>Up next</span><ul></ul></div></div>';
+      '<form class="np-gform dj-f"><input type="search" class="np-q" placeholder="Type a genre…" aria-label="Type a genre for the DJ" autocomplete="off" spellcheck="false"><button type="submit">Play</button></form></div><div class="dj-upnext"><span>Up next</span><ul></ul></div></div>' +
+      (opts.app ? '<div class="dj-yt-grab" title="Drag up to return to the tablet" aria-hidden="true"></div>' : '');
     document.body.appendChild(djEl);
     function djQ(c) { return djEl.querySelector(c); }
-    var djOpen = false, djArt = '', djFetching = false, djLastId = null, toastT = 0, view = null, nowFrom = '', nextFor = null;
+    var djOpen = false, djArt = '', djFetching = false, djStartPending = false, djRefillAt = 0, djLastId = null, toastT = 0, view = null, nowFrom = '', nextFor = null;
     function djToast(msg, ok) { if (!djOpen) return; var t = djQ('.dj-toast'); clearTimeout(toastT); t.textContent = msg; t.classList.toggle('bad', !ok); toastT = setTimeout(function () { t.textContent = ''; }, 4500); }
     function vibeText() { return (dj.g === 'foryou' ? 'From your playlists' : vlabel(dj.g)) + ' · ' + era(dj.e)[1]; }
     function djChips() {
@@ -1228,12 +1319,15 @@ window.NowPlaying = (function () {
     function djPaint() {
       if (!djOpen) return;
       if (view === 'yt') return ytPaint();
-      djEl.classList.toggle('playing', !!(S && S.is_playing));
-      var p = djQ('.dj-play'); p.innerHTML = S && S.is_playing ? ICON.pause : ICON.play; p.setAttribute('aria-label', S && S.is_playing ? 'Pause' : 'Play');
-      var ul = djQ('.dj-upnext ul'), idx = djIndex();
+      var ul = djQ('.dj-upnext ul'), idx = djIndex(), startSet = view === 'dj' && idx < 0;
+      var playing = !startSet && !!(S && S.is_playing);
+      djEl.classList.toggle('playing', playing);
+      var p = djQ('.dj-play'); p.innerHTML = playing ? ICON.pause : ICON.play; p.setAttribute('aria-label', startSet ? 'Start DJ set' : playing ? 'Pause' : 'Play');
       if (!S || !S.item) {
         djQ('.dj-t').textContent = 'Ready when you are'; djQ('.dj-a').textContent = view === 'dj' ? 'Press play: the DJ picks new songs for ' + vibeText() : 'Play something to see it here';
-        djQ('.dj-line').textContent = 'Worlds DJ'; djQ('.dj-cover').removeAttribute('src'); djQ('.dj-glow').removeAttribute('src'); djArt = ''; ul.textContent = ''; return;
+        djQ('.dj-line').textContent = 'Worlds DJ'; djQ('.dj-cover').removeAttribute('src'); djQ('.dj-glow').removeAttribute('src'); djArt = '';
+        djQ('.dj-cur').textContent = djQ('.dj-dur').textContent = '0:00'; djQ('.dj-bar i').style.width = '0';
+        ul.textContent = ''; djQ('.dj-upnext').hidden = true; return;
       }
       var it = S.item, img = it.album && it.album.images && it.album.images[0] ? it.album.images[0].url : (it.images && it.images[0] ? it.images[0].url : '');
       if (img !== djArt) { djArt = img; djQ('.dj-cover').src = img; djQ('.dj-glow').src = img; }
@@ -1254,15 +1348,20 @@ window.NowPlaying = (function () {
     // YouTube in the full view: its video sits where the cover goes (YouTube asks that its player stays visible)
     function ytPaint() {
       var d = yt.info();
+      if (opts.app) {
+        box.classList.toggle('yt-frame', !d.error && !!yt.vidEl.querySelector('iframe'));
+        djQ('.dj-vibe').textContent = d.title;
+      }
       djEl.classList.toggle('playing', d.playing);
       var p = djQ('.dj-play'); p.innerHTML = d.playing ? ICON.pause : ICON.play; p.setAttribute('aria-label', d.playing ? 'Pause' : 'Play');
-      djQ('.dj-t').textContent = d.title || 'YouTube Music'; djQ('.dj-a').textContent = d.author || 'Pick a mix or a playlist';
-      djQ('.dj-line').textContent = 'YouTube Music';
-      var g = d.vid ? 'https://i.ytimg.com/vi/' + encodeURIComponent(d.vid) + '/hqdefault.jpg' : '';
+      djQ('.dj-t').textContent = d.title || 'YouTube'; djQ('.dj-a').textContent = d.error || d.author || 'Pick a video, mix or playlist';
+      djQ('.dj-line').textContent = 'YouTube';
+      var g = d.vid && !opts.app ? 'https://i.ytimg.com/vi/' + encodeURIComponent(d.vid) + '/hqdefault.jpg' : '';
       if (g !== djArt) { djArt = g; if (g) djQ('.dj-glow').src = g; else djQ('.dj-glow').removeAttribute('src'); }
       djQ('.dj-upnext').hidden = true; placeVid();
     }
     function placeVid() {
+      if (opts.app) return;
       var v = yt && yt.vidEl; if (!v) return;
       if (view !== 'yt') { v.style.left = v.style.top = v.style.width = v.style.height = ''; return; }
       var r = djQ('.dj-cover').getBoundingClientRect(); v.style.left = r.left + 'px'; v.style.top = r.top + 'px'; v.style.width = r.width + 'px'; v.style.height = r.height + 'px';
@@ -1279,38 +1378,58 @@ window.NowPlaying = (function () {
     }
     // a new vibe (or a fresh start): a batch of new songs, playing now
     function djStart() {
-      dj.on = true; djChips(); djSave(); djToast('Finding new ' + vibeText().replace(' · ', ', ') + ' songs…', true);
+      dj.on = true; djChips(); djSave();
+      if (djFetching) { djStartPending = true; return; }
       djFetching = true;
+      var label = vibeText();
+      djToast('Finding tracks for ' + label + '…', true);
       newSongs(dj.g, dj.e, 10).then(function (ts) {
-        djFetching = false;
-        if (!ts.length) { var rest = searchResting(); djToast(rest ? 'Spotify\'s search allowance is used up: the DJ can look again in about ' + Math.max(1, Math.round((rest - Date.now()) / 60000)) + ' min' : 'Nothing new turned up for ' + vibeText() + '. Try another genre.'); return; }
-        if (reason.indexOf('while') >= 0) djToast('Spotify\'s search allowance is used up for now: playing from your playlists', false);
-        dj.list = ts.map(djEntry); djSave(); seenAdd(ts.map(function (t) { return t.id; }));
-        play({ uris: ts.map(function (t) { return t.uri; }) }, vibeText());
-      }, function (e) { djFetching = false; djToast(why(e)); });
+        if (!dj.on || djStartPending) return;
+        if (!ts.length) { var rest = searchResting(); djToast(rest ? retryMessage(rest, true, searchLimit) : 'No playable tracks found for ' + label + '. Try another genre.'); return; }
+        var entries = ts.map(djEntry), fallback = reason.indexOf('while') >= 0;
+        return play({ uris: ts.map(function (t) { return t.uri; }) }, fallback ? 'tracks from your library' : label).then(function (ok) {
+          if (!ok) return;
+          dj.list = entries; djRefillAt = 0; djSave(); seenAdd(ts.map(function (t) { return t.id; }));
+        });
+      }).catch(function (e) { djToast(why(e)); }).finally(finishDjWork);
+    }
+    function finishDjWork() {
+      djFetching = false;
+      if (!djStartPending) return;
+      djStartPending = false;
+      if (dj.on) djStart();
     }
     // and then it carries on: with three of its songs left, it queues more
     function djKeepGoing() {
-      if (!dj.on || djFetching || !S || !S.item) return;
+      if (!dj.on || djFetching || busy || !S || !S.is_playing || !S.item || Date.now() < djRefillAt) return;
       dj = Object.assign(djLoad(), { on: dj.on });   // another wallpaper may have added songs
       var idx = djIndex(); if (idx < 0 || dj.list.length - 1 - idx > 3 || !djLock()) return;
       djFetching = true;
+      var device = S.device && S.device.id, query = device ? '&device_id=' + encodeURIComponent(device) : '';
       newSongs(dj.g, dj.e, 6).then(function (ts) {
-        return ts.reduce(function (p, t) { return p.then(function () { return call('POST', '/me/player/queue?uri=' + encodeURIComponent(t.uri)).then(function () { dj.list.push(djEntry(t)); seenAdd([t.id]); }); }); }, Promise.resolve());
-      }).catch(function (e) { djToast(why(e)); }).then(function () { djFetching = false; djSave(); djPaint(); });
+        if (!ts.length) djRefillAt = Math.max(searchResting(), Date.now() + 30000);
+        return ts.reduce(function (p, t) { return p.then(function () {
+          if (!dj.on || djStartPending || busy || !S || !S.is_playing || (S.device && S.device.id) !== device) return;
+          return call('POST', '/me/player/queue?uri=' + encodeURIComponent(t.uri) + query).then(function () { dj.list.push(djEntry(t)); seenAdd([t.id]); });
+        }); }, Promise.resolve());
+      }).catch(function (e) { djRefillAt = Math.max(e.retryAt || 0, Date.now() + 30000); djToast(why(e)); }).finally(function () { djSave(); djPaint(); finishDjWork(); });
     }
-    // the full view: 'dj' (the DJ's songs, and its vibe), 'now' (whatever plays, with its own list), 'yt' (YouTube Music), or null
-    function setView(v) {
+    // the full view: 'dj' (the DJ's songs, and its vibe), 'now' (whatever plays, with its own list), 'yt' (YouTube), or null
+    function setView(v, returnExpanded) {
       view = v; djOpen = !!v; djEl.classList.toggle('on', !!v); djEl.setAttribute('aria-hidden', String(!v));
       ['dj', 'now', 'yt'].forEach(function (m) { djEl.classList.toggle('m-' + m, v === m); });
-      djEl.setAttribute('aria-label', v === 'dj' ? 'DJ mode' : v === 'yt' ? 'YouTube Music' : 'Now playing');
-      djQ('.dj-tag em').textContent = v === 'dj' ? 'Worlds DJ' : v === 'yt' ? 'YouTube Music' : 'Now playing';
+      djEl.setAttribute('aria-label', v === 'dj' ? 'DJ mode' : v === 'yt' ? 'YouTube' : 'Now playing');
+      djQ('.dj-tag em').textContent = v === 'dj' ? 'Worlds DJ' : v === 'yt' ? 'YouTube' : 'Now playing';
+      var close = djQ('.dj-x'), minimize = opts.app && v === 'yt';
+      close.innerHTML = minimize ? ICON.narrow + '<span>Back to tablet</span>' : ICON.x;
+      close.title = minimize ? 'Back to tablet' : v === 'dj' ? 'Exit DJ mode' : 'Exit full screen';
+      close.setAttribute('aria-label', close.title);
       var hideCard = v === 'dj' || v === 'now';
       box.classList.toggle('dj-hide', hideCard); tab.classList.toggle('dj-hide', !!v);
       box.classList.toggle('yt-full', v === 'yt');
+      window.dispatchEvent(new CustomEvent('np:view', { detail: { view: v, returnExpanded: returnExpanded } }));
       if (v) { setBig(false); djLastId = null; djArt = ''; nextFor = null; if (v === 'dj') djChips(); else djQ('.dj-vibe').textContent = v === 'now' && nowFrom ? nowFrom : ''; if (v !== 'yt') checkLiked(); djPaint(); wake(); }
       requestAnimationFrame(placeVid);
-      window.dispatchEvent(new CustomEvent('np:view', { detail: { view: v } }));
     }
     function setDj(open) { setView(open ? 'dj' : null); }
     function openNow(label) { nowFrom = label || ''; setView('now'); }
@@ -1323,6 +1442,15 @@ window.NowPlaying = (function () {
     djQ('.dj-go').addEventListener('click', function () { djEnter(true); });
     $('.np-art').addEventListener('click', function () { if (S && S.item && !idleMode) openNow(); });   // the cover opens the full view
     djQ('.dj-x').addEventListener('click', djLeave);
+    if (opts.app) {
+      var ytGrab = djQ('.dj-yt-grab'), grabY = null;
+      ytGrab.addEventListener('pointerdown', function (e) {
+        if (view !== 'yt' || e.button !== 0) return;
+        grabY = e.clientY; ytGrab.setPointerCapture(e.pointerId);
+      });
+      ytGrab.addEventListener('pointermove', function (e) { if (grabY != null && grabY - e.clientY >= 28) { grabY = null; djLeave(); } });
+      ytGrab.addEventListener('lostpointercapture', function () { grabY = null; });
+    }
     (function () {   // the card follows the mouse
       var card = djQ('.dj-card'), still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       card.addEventListener('pointermove', function (e) {
@@ -1340,7 +1468,7 @@ window.NowPlaying = (function () {
         djQ('.dj-play').click();
       });
     })();
-    djQ('.dj-play').addEventListener('click', function () { if (view === 'yt') { yt.toggle(); return; } if (!S || !S.item) { if (view === 'dj') djStart(); return; } $('.np-play').click(); setTimeout(djPaint, 50); });
+    djQ('.dj-play').addEventListener('click', function () { if (view === 'yt') { yt.toggle(); return; } if (view === 'dj' && djIndex() < 0) { if (!djFetching) djStart(); return; } if (S && S.item) { $('.np-play').click(); setTimeout(djPaint, 50); } });
     djQ('.dj-next').addEventListener('click', function () { if (view === 'yt') yt.next(); else $('.np-next').click(); });
     djQ('.dj-prev').addEventListener('click', function () { if (view === 'yt') yt.prev(); else $('.np-prev').click(); });
     djQ('.dj-like').addEventListener('click', function () { $('.np-like').click(); djPaint(); });
@@ -1404,7 +1532,7 @@ window.NowPlaying = (function () {
     }
     $('.np-pip').addEventListener('click', openPip);
     djQ('.dj-pip').addEventListener('click', function () { if (view === 'yt') yt.pip(); else openPip(); });
-    if (dj.on && enabled) setDj(true);   // DJ mode stays on across restarts (and through the rotation)
+    if (dj.on && enabled && !opts.app) setDj(true);   // keep the desktop pill compact when reopening the app
 
     // Library: playlists, recently played, top songs and top artists (4 weeks, 6 months, all time)
     var lib = 'pl', range = 'short_term';
@@ -1413,7 +1541,10 @@ window.NowPlaying = (function () {
     $$('.np-lrange button').forEach(function (b) { b.addEventListener('click', function () { range = b.getAttribute('data-r'); fillLib(); }); });
     // Liked Songs: Spotify keeps it out of your playlists, so it gets a row of its own, and a list (the newest 50)
     function playLiked() { me().then(function (m) { play({ context_uri: 'spotify:user:' + m.id + ':collection' }, 'Liked Songs'); }, function (e) { flash(why(e)); }); }
-    function likedRow() { return { t: 'Liked Songs', s: 'All your saved songs', icon: ICON.heart, go: playLiked }; }
+    function likedRow() {
+      if (lib === 'liked') return { t: 'Liked Songs', s: 'Play your saved songs', icon: ICON.heart, go: playLiked };
+      return { t: 'Liked Songs', s: 'Browse your saved songs', icon: ICON.heart, verb: 'Open', go: function () { lib = 'liked'; fillLib(); } };
+    }
     function fillLiked(ok, ul) {
       function songs(j) { return (j && j.items || []).map(function (x) { return x && (x.track || x.item); }).filter(function (t) { return t && t.uri && t.type !== 'episode'; }); }
       var OLD = function () { return call('GET', '/me/tracks?limit=50'); }, NEW = function () { return call('GET', '/me/library?limit=50'); };
@@ -1451,16 +1582,25 @@ window.NowPlaying = (function () {
       call('GET', '/me/player/devices').then(function (j) {
         if (!ok()) return; var ds = j && j.devices || [];
         list(ul, ds.length ? ds.map(function (d) {
-          var mine = d.id === hereId;
-          return { t: d.name + (mine ? ' (this one)' : ''), s: [d.type, d.is_active ? 'playing here' : 'press to play here', d.volume_percent != null ? 'vol ' + d.volume_percent + '%' : ''].filter(Boolean).join(' · '),
-            icon: DEV[d.type] || DEV.Speaker, on: d.is_active, verb: 'Play on', go: d.is_active || d.is_restricted ? null : function () { transfer(d); } };
-        }) : [{ empty: 'No devices awake. Open Spotify on your phone or computer, or turn on “Play on this wallpaper”.' }]);
+          var mine = d.id && d.id === hereId, available = d.id && !d.is_restricted;
+          var selected = selectedDevice && d.id === selectedDevice.id;
+          var state = d.is_active ? 'Active' : selected ? 'Selected for the next track' : available ? 'Play here' : 'Spotify controls unavailable';
+          return { t: d.name + (mine ? ' (this one)' : ''), s: [d.type, state, d.volume_percent != null ? 'vol ' + d.volume_percent + '%' : ''].filter(Boolean).join(' · '),
+            icon: DEV[d.type] || DEV.Speaker, on: d.is_active || selected, verb: 'Play on', go: d.is_active || !available ? null : function () { transfer(d); } };
+        }) : [{ empty: 'No Spotify devices available. Open Spotify on the device you want to use, then refresh.' }]);
       }, function (e) { if (ok()) failed(ul, e); });
     }
     function transfer(d) {
-      hold = Date.now() + 2000;
-      call('PUT', '/me/player', { device_ids: [d.id], play: true }).then(function () { flash('Now on ' + d.name, true); setTimeout(function () { hold = 0; poll(); if (pane === 'dev') fillDev(); }, 900); },
-        function (e) { hold = 0; flash(why(e)); });
+      if (busy) return;
+      busy = true; lastAction = Date.now(); hold = lastAction + 2000;
+      call('PUT', '/me/player', { device_ids: [d.id], play: true }).then(function () {
+        selectedDevice = d; deviceSettlesAt = Date.now() + 5000; flash('Selected ' + d.name, true);
+        setTimeout(function () { hold = 0; poll(); if (pane === 'dev') fillDev(); }, 900);
+      }, function (e) {
+        hold = 0;
+        if (e.status === 404 && (!S || !S.item)) { selectedDevice = d; deviceSettlesAt = 0; flash('Selected ' + d.name + '. Pick a track to start playback.', true); if (pane === 'dev') fillDev(); }
+        else flash(why(e));
+      }).finally(function () { busy = false; });
     }
 
     // the wallpaper as a speaker: Spotify's own in-browser player makes this page a device (Premium; the browser must allow protected audio)
@@ -1558,8 +1698,15 @@ window.NowPlaying = (function () {
       onStatus: function (fn) { statusFns.push(fn); fn(status, note); },
       // for the island: which source, open or closed, the full view, the buttons, what plays
       setSource: function (s2) { if (s2 === 'sp' || (s2 === 'yt' && yt)) setSrc(s2, true); },
+      setPanelActive: function (active) {
+        if (active === panelActive) return;
+        panelActive = active;
+        if (active) poll();
+        else if (!polling) { clearTimeout(timer); timer = setTimeout(poll, gap()); }
+      },
       source: function () { return src; },
       setBig: function (b) { setBig(!!b); }, isBig: function () { return box.classList.contains('big'); },
+      openDevices: function () { setPane('dev', true); },
       openView: function (v) { if (v === 'dj') djEnter(); else if (v === 'yt') setView('yt'); else openNow(); },
       closeView: function () { if (view) djLeave(); },
       view: function () { return view; },
