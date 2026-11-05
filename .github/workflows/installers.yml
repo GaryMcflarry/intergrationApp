@@ -20,10 +20,11 @@ jobs:
         run: |
           set -euo pipefail
           docker build -f deploy/Dockerfile -t astrum-site .
-          docker run -d --rm --name astrum-site -p 127.0.0.1:8080:8080 astrum-site
-          trap 'docker rm -f astrum-site >/dev/null' EXIT
+          docker run --rm astrum-site nginx -t
+          docker run -d --name astrum-site -p 127.0.0.1:8080:8080 astrum-site
+          trap 'docker logs astrum-site >&2; docker rm -f astrum-site >/dev/null' EXIT
           base=http://127.0.0.1:8080
-          curl -fsS --retry 8 --retry-connrefused --retry-delay 1 "$base/" > "$RUNNER_TEMP/astrum-home.html"
+          curl -fsS --retry 8 --retry-all-errors --retry-delay 1 "$base/" > "$RUNNER_TEMP/astrum-home.html"
           curl -fsS "$base/setup.html" > "$RUNNER_TEMP/astrum-setup.html"
           for service in spotify youtube discord; do
             grep -F "setup.html#$service" "$RUNNER_TEMP/astrum-home.html"
