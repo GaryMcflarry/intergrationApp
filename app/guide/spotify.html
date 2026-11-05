@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spotify · integrationApp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="guide.css">
+</head>
+<body style="--acc:#1ed760">
+<main>
+  <header class="top"><span class="logo" id="logo"></span><h1><small>integrationApp · set up</small>Spotify</h1></header>
+  <p class="lead">Spotify lets an app on your computer use your account through an <b>app of your own</b> in Spotify's developer dashboard (free, a minute's work). You sign in on Spotify's own page, here in your browser.</p>
+
+  <section class="card">
+    <h2>1 · Make a Spotify app</h2>
+    <ol>
+      <li>Open the <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">Spotify developer dashboard</a>, log in, and press <b>Create app</b>. Any name and description.</li>
+      <li>Under <b>Redirect URIs</b>, add exactly: <span class="mono" id="redir"></span> <button type="button" id="copy">Copy</button></li>
+      <li>Under <b>Which API/SDKs are you planning to use?</b>, tick <b>Web API</b>, then save.</li>
+      <li>In the app's <b>User Management</b>, add the email of your Spotify account (apps in development mode only work for the people listed there).</li>
+    </ol>
+    <p class="note">Already have one for the Worlds wallpapers? Use it: just add the redirect address above to it.</p>
+  </section>
+
+  <section class="card">
+    <h2>2 · Its Client ID <span class="st" id="cst"></span></h2>
+    <p class="note">On the app's <b>Settings</b> page, copy the <b>Client ID</b> (32 letters and numbers; it is not a secret).</p>
+    <label class="f">Client ID<input type="text" id="cid" spellcheck="false" autocomplete="off" placeholder="32 letters and numbers"></label>
+    <div class="row"><button type="button" id="save">Save</button></div>
+  </section>
+
+  <section class="card">
+    <h2>3 · Connect your account <span class="st" id="st">…</span></h2>
+    <div class="row"><a class="btn go" href="/spotify/login" id="connect">Connect Spotify</a><button type="button" id="out" hidden>Disconnect</button></div>
+    <p class="msg" id="msg" aria-live="polite"></p>
+    <p class="note">Spotify asks you to agree; then it comes back here and the island shows what you play. Controlling playback (play, skip, the DJ) needs <b>Spotify Premium</b>; it plays on your Spotify devices (phone, the Spotify app, a web player).</p>
+  </section>
+  <footer><a href="./">← All set-up</a></footer>
+</main>
+<script src="guide.js"></script>
+<script>
+(function () {
+  'use strict';
+  if (!IA.onHost('127.0.0.1')) return;   // Spotify only returns to 127.0.0.1
+  var $ = IA.$, q = new URLSearchParams(location.search), redir = location.origin + '/spotify/callback';
+  $('logo').innerHTML = IA.ICON.sp; $('redir').textContent = redir;
+  $('copy').addEventListener('click', function () { IA.copy(redir, $('msg')); });
+  function paint(s) {
+    IA.say($('cst'), s.spotify.client ? 'saved' : 'not added yet', s.spotify.client);
+    IA.say($('st'), s.spotify.connected ? 'connected' : 'not connected', s.spotify.connected);
+    $('out').hidden = !s.spotify.connected; $('connect').textContent = s.spotify.connected ? 'Connect again' : 'Connect Spotify';
+    return s;
+  }
+  var ready = IA.status().then(paint, function (e) { IA.say($('msg'), e.message); });
+  if (q.get('connected')) IA.say($('msg'), 'Connected: the island has it now. You can close this tab.', true);
+  if (q.get('error')) IA.say($('msg'), q.get('error') + (/INVALID_CLIENT|redirect/i.test(q.get('error')) ? ' (check the Client ID and the redirect address in step 1)' : ''));
+  if (q.get('connected') || q.get('error')) history.replaceState(null, '', location.pathname);
+  $('save').addEventListener('click', function () {
+    IA.api('/api/spotify/client', { clientId: $('cid').value.trim() }).then(function () { IA.say($('msg'), 'Saved. Now press Connect Spotify.', true); return IA.status().then(paint); }, function (e) { IA.say($('msg'), e.message); });
+  });
+  $('connect').addEventListener('click', function (e) {
+    var id = $('cid').value.trim();
+    if (id) { e.preventDefault(); IA.api('/api/spotify/client', { clientId: id }).then(function () { location.href = '/spotify/login'; }, function (er) { IA.say($('msg'), er.message); }); }
+  });
+  $('out').addEventListener('click', function () { IA.api('/api/spotify/signout', {}).then(function () { IA.say($('msg'), 'Disconnected.', true); return IA.status().then(paint); }); });
+  // from the island's Sign in: straight on to Spotify when the Client ID is there
+  if (q.get('signin') === '1') ready.then(function (s) { if (s && s.spotify.client) location.href = '/spotify/login'; else IA.say($('msg'), 'Add your Client ID first (step 2).'); });
+})();
+</script>
+</body>
+</html>

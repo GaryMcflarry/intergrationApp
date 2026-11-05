@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube Music · integrationApp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="guide.css">
+</head>
+<body style="--acc:#ff8a84">
+<main>
+  <header class="top"><span class="logo" id="logo"></span><h1><small>integrationApp · set up</small>YouTube Music</h1></header>
+  <p class="lead">The island plays YouTube Music in YouTube's own player, and brings in <b>your playlists and liked songs</b> (read-only) through a Google app of your own. YouTube gives apps no recommendations feed, so <i>For you</i> uses YouTube's own mixes started from songs you like.</p>
+
+  <section class="card">
+    <h2>1 · Make a Google app</h2>
+    <ol>
+      <li>Open the <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">Google Cloud console</a> and create a project (any name).</li>
+      <li>In <b>APIs &amp; Services → Library</b>, find <b>YouTube Data API v3</b> and press <b>Enable</b>.</li>
+      <li>In <b>Google Auth Platform</b> (the OAuth consent screen), choose <b>External</b>, fill in the app name and your email, and under <b>Audience → Test users</b> add your Google account.</li>
+      <li>In <b>Clients</b>, create a client of type <b>Web application</b>. Under <b>Authorized JavaScript origins</b>, add exactly: <span class="mono" id="origin"></span> <button type="button" id="copy">Copy</button></li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>2 · Sign in <span class="st" id="st">…</span></h2>
+    <label class="f">Client ID<input type="text" id="cid" spellcheck="false" autocomplete="off" placeholder="…apps.googleusercontent.com"></label>
+    <div class="row"><button type="button" class="go" id="connect">Sign in with Google</button><button type="button" id="out" hidden>Remove my library</button></div>
+    <p class="msg" id="msg" aria-live="polite"></p>
+    <p class="note">While the Google app is in testing, Google warns that it is not verified: press <b>Continue</b>. Sign in again here any time to bring in new playlists.</p>
+  </section>
+  <footer><a href="http://127.0.0.1:43210/guide/">← All set-up</a></footer>
+</main>
+<script src="guide.js"></script>
+<script src="../ytmusic.js"></script>
+<script>
+(function () {
+  'use strict';
+  if (!IA.onHost('localhost')) return;   // Google allows signing in on localhost
+  var $ = IA.$, Y = window.YTMusic;
+  $('logo').innerHTML = IA.ICON.yt; $('origin').textContent = location.origin;
+  document.querySelector('footer a').href = 'http://127.0.0.1:' + location.port + '/guide/';
+  $('copy').addEventListener('click', function () { IA.copy(location.origin, $('msg')); });
+  $('cid').value = Y.clientId();
+  function paint(s) {
+    var lib = s && s.youtube.library;
+    IA.say($('st'), lib ? lib.playlists + ' playlists · ' + lib.liked + ' liked' : 'not signed in', !!lib);
+    $('out').hidden = !lib; $('connect').textContent = lib ? 'Sign in again (update)' : 'Sign in with Google';
+  }
+  IA.status().then(paint, function (e) { IA.say($('msg'), e.message); });
+  // what this browser now has, handed to the app
+  function handOver() {
+    return ['yt-client', 'yt-library-v1', 'yt-token'].reduce(function (p, k) {
+      return p.then(function () { var v = null; try { v = localStorage.getItem(k); } catch (e) { } return IA.api('/api/kv', { key: k, value: v }); });
+    }, Promise.resolve());
+  }
+  $('connect').addEventListener('click', function () {
+    var id = $('cid').value.trim();
+    if (!/\.apps\.googleusercontent\.com$/.test(id)) { IA.say($('msg'), 'Paste your Client ID first (it ends in .apps.googleusercontent.com).'); $('cid').focus(); return; }
+    Y.setClientId(id); IA.say($('msg'), 'Waiting for Google…');
+    Y.fetchLibrary('select_account').then(function (lib) {
+      return handOver().then(function () { IA.say($('msg'), 'Done: ' + lib.pls.length + ' playlists and ' + lib.liked.length + ' liked songs are in the island. You can close this tab.', true); return IA.status().then(paint); });
+    }).catch(function (e) { IA.say($('msg'), /has not been used|disabled/i.test(e.message) ? 'Turn on "YouTube Data API v3" for your project (step 1), then try again.' : e.message); });
+  });
+  $('out').addEventListener('click', function () {
+    Y.disconnect();
+    IA.api('/api/kv', { key: 'yt-library-v1', value: null }).then(function () { return IA.api('/api/kv', { key: 'yt-token', value: null }); }).then(function () { IA.say($('msg'), 'Removed.', true); return IA.status().then(paint); });
+  });
+})();
+</script>
+</body>
+</html>
