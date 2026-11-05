@@ -1,108 +1,121 @@
 'use strict';
-/* integrationApp: the Worlds music player (Spotify and YouTube Music) as a desktop widget, with Discord.
-   - a small frameless window that fits the player (and goes full screen for the full view / DJ mode)
-   - a tray icon: show / hide, always on top, settings, quit
-   - Spotify and YouTube sign-in pages open in their own windows
-   - Discord Rich Presence follows what plays; the Share button posts the song to a channel webhook */
-const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage, screen, dialog } = require('electron');
+/* integrationApp: a Dynamic Island at the top of your desktop, for Spotify, YouTube Music and Discord.
+   - the island: a small pill (what plays, or Discord) that opens into tabs, then the full player, then the whole screen
+   - set-up happens in your browser: guide pages served by this app connect each service and hand the result over
+   - Discord: Rich Presence follows what plays, a bot of yours brings in the latest messages, Share posts a song */
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage, screen, dialog, safeStorage } = require('electron');
 const path = require('node:path');
 const server = require('./lib/server');
 const { createStore } = require('./lib/store');
 const discord = require('./lib/discord');
+const { createBot } = require('./lib/discordbot');
+const { createSpotifyAuth } = require('./lib/spotify-auth');
+const { createApi } = require('./lib/api');
 const ICON = require('./lib/icon');
 
-const ORIGIN = `http://127.0.0.1:${server.PORT}`;     // the widget (Spotify returns here after signing in)
-const GOOGLE = `http://localhost:${server.PORT}`;     // the YouTube page (Google signs in here)
-const SETUP_PAGES = new Set(['/spotify.html', '/youtube.html', '/settings.html']);
+const ORIGIN = `http://127.0.0.1:${server.PORT}`;     // the island, the guides, Spotify's return address
+const GOOGLE = `http://localhost:${server.PORT}`;     // the YouTube guide (Google signs in here)
+const GUIDES = { index: ORIGIN + '/guide/', spotify: ORIGIN + '/guide/spotify.html', youtube: GOOGLE + '/guide/youtube.html', discord: ORIGIN + '/guide/discord.html' };
 
-// Google refuses to sign in inside apps that say they are Electron: present as the Chrome it is built on
+// Google refuses sign-in inside apps that say they are Electron: present as the Chrome it is built on
 app.userAgentFallback = app.userAgentFallback.replace(/\s?Electron\/\S+/, '').replace(/\s?integrationApp\/\S+/i, '');
+if (!app.requestSingleInstanceLock()) app.quit();
 
-if (!app.requestSingleInstanceLock()) { app.quit(); }
-
-let win = null, tray = null, store = null, presence = null, quitting = false, fullBounds = null;
-const setupWins = new Map();
+let island = null, tray = null, store = null, presence = null, bot = null, quitting = false, full = null, lastStatus = { text: 'Starting…', ok: false };
 
 function sendAll(channel, payload) { for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload); }
 
-function webPrefs() {
-  return { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false };
+/* ---------- the guide pages open in your browser ---------- */
+function openGuide(what) {
+  let url = GUIDES[what] || GUIDES.index;
+  if (typeof what === 'string' && /^https?:\/\//.test(what)) {   // a page of this app (e.g. from the player's Sign in): its guide
+    try {
+      const u = new URL(what);
+      if (/youtube/.test(u.pathname)) url = GUIDES.youtube;
+      else if (/spotify/.test(u.pathname)) url = GUIDES.spotify + (u.searchParams.get('signin') === '1' ? '?signin=1' : '');
+      else if (/discord/.test(u.pathname)) url = GUIDES.discord;
+    } catch { /* the hub */ }
+  }
+  shell.openExternal(url);
 }
 
-// links to elsewhere open in your browser; Google's sign-in popup stays in the app (it reports back to the page)
-function guard(w, { allowGoogle = false } = {}) {
-  w.webContents.setWindowOpenHandler(({ url }) => {
-    if (allowGoogle && /^https:\/\/accounts\.google\.com\//.test(url)) return { action: 'allow', overrideBrowserWindowOptions: { width: 500, height: 680, autoHideMenuBar: true } };
-    if (/^https?:\/\//.test(url)) shell.openExternal(url);
-    return { action: 'deny' };
-  });
+/* ---------- the bot token: encrypted with the system keychain where there is one ---------- */
+function getBotToken() {
+  const v = store.settings().botToken; if (!v) return '';
+  try { return v.startsWith('enc:') ? safeStorage.decryptString(Buffer.from(v.slice(4), 'base64')) : v.replace(/^raw:/, ''); } catch { return ''; }
+}
+async function setBotToken(token) {
+  if (!token) { store.setSettings({ botToken: '' }); bot.refresh().catch(() => {}); return { ok: true }; }
+  const before = store.settings().botToken;
+  store.setSettings({ botToken: safeStorage.isEncryptionAvailable() ? 'enc:' + safeStorage.encryptString(token).toString('base64') : 'raw:' + token });
+  try { const me = await bot.whoami(); bot.start(); return { ok: true, name: me.username }; }
+  catch (e) { store.setSettings({ botToken: before }); return { ok: false, error: e.status === 401 ? 'Discord did not accept that token' : e.message }; }
 }
 
-function createWidget() {
-  const s = store.settings(), b = s.bounds;
-  win = new BrowserWindow({
-    width: 396, height: 180, x: b && b.x, y: b && b.y, minWidth: 300, minHeight: 120,
-    frame: false, transparent: true, resizable: false, hasShadow: false, show: false,
-    alwaysOnTop: s.alwaysOnTop, skipTaskbar: false, title: 'integrationApp', icon: nativeImage.createFromDataURL(ICON),
-    backgroundColor: '#00000000', webPreferences: webPrefs()
+/* ---------- the island window ---------- */
+function workArea() { return screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea; }
+function placeIsland(w, h) {
+  if (!island || full) return;
+  const d = screen.getDisplayMatching(island.getBounds()).workArea;
+  const width = Math.max(120, Math.min(d.width, Math.round(w))), height = Math.max(40, Math.min(d.height, Math.round(h)));
+  island.setBounds({ x: Math.round(d.x + (d.width - width) / 2), y: d.y, width, height });
+}
+function createIsland() {
+  const d = workArea();
+  island = new BrowserWindow({
+    width: 300, height: 64, x: Math.round(d.x + (d.width - 300) / 2), y: d.y,
+    frame: false, transparent: true, resizable: false, movable: false, minimizable: false, maximizable: false, fullscreenable: false,
+    hasShadow: false, skipTaskbar: true, alwaysOnTop: true, show: false, title: 'integrationApp', backgroundColor: '#00000000',
+    icon: nativeImage.createFromDataURL(ICON),
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false }
   });
-  guard(win);
-  // the sign-in and settings pages open in their own windows; Spotify's sign-in itself may pass through this one
-  win.webContents.on('will-navigate', (e, url) => {
+  island.setAlwaysOnTop(true, 'screen-saver');
+  if (process.platform === 'darwin') island.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  island.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); return { action: 'deny' }; });
+  island.webContents.on('will-navigate', (e, url) => {   // the island never leaves; set-up pages open in your browser
+    e.preventDefault();
     let u; try { u = new URL(url); } catch { return; }
-    if ((u.origin === ORIGIN || u.origin === GOOGLE) && SETUP_PAGES.has(u.pathname)) { e.preventDefault(); openSetup(url); return; }
-    if (u.origin !== ORIGIN) { e.preventDefault(); shell.openExternal(url); }
+    if (u.origin === ORIGIN || u.origin === GOOGLE) openGuide(url); else shell.openExternal(url);
   });
-  win.loadURL(ORIGIN + '/index.html');
-  win.once('ready-to-show', () => win.show());
-  win.on('moved', () => { if (!win.isFullScreen() && !fullBounds) { const { x, y } = win.getBounds(); store.setSettings({ bounds: { x, y } }); } });
-  win.on('close', (e) => { if (!quitting && store.settings().closeToTray) { e.preventDefault(); win.hide(); } });
-  win.on('closed', () => { win = null; });
+  island.loadURL(ORIGIN + '/island.html');
+  island.once('ready-to-show', () => island.showInactive());
+  island.on('closed', () => { island = null; });
+  screen.on('display-metrics-changed', () => island && island.webContents.send('island-reflow'));
 }
-
-function openSetup(url) {
-  let u; try { u = new URL(url, ORIGIN); } catch { return; }
-  if (!SETUP_PAGES.has(u.pathname)) return;
-  if (u.pathname === '/youtube.html') u = new URL(GOOGLE + u.pathname + u.search);   // Google's sign-in wants localhost
-  const key = u.pathname, open = setupWins.get(key);
-  if (open && !open.isDestroyed()) { open.loadURL(u.href); open.show(); open.focus(); return; }
-  const w = new BrowserWindow({ width: 760, height: 860, title: 'integrationApp', autoHideMenuBar: true, backgroundColor: '#07080d', icon: nativeImage.createFromDataURL(ICON), webPreferences: webPrefs() });
-  guard(w, { allowGoogle: key === '/youtube.html' });
-  w.webContents.on('will-navigate', (e, to) => {
-    // these pages may go to Spotify's sign-in and back; anything else opens in your browser
-    if (/^https:\/\/accounts\.spotify\.com\//.test(to) || to.startsWith(ORIGIN + '/') || to.startsWith(GOOGLE + '/')) return;
-    e.preventDefault(); shell.openExternal(to);
-  });
-  w.loadURL(u.href);
-  setupWins.set(key, w);
-  w.on('closed', () => setupWins.delete(key));
-}
-
-function toggleWidget() { if (!win) return createWidget(); if (win.isVisible() && win.isFocused()) win.hide(); else { win.show(); win.focus(); } }
 
 function buildTray() {
   tray = new Tray(nativeImage.createFromDataURL(ICON));
   tray.setToolTip('integrationApp');
   const menu = () => Menu.buildFromTemplate([
-    { label: 'Show / hide the player', click: toggleWidget },
-    { label: 'Always on top', type: 'checkbox', checked: store.settings().alwaysOnTop, click: (m) => setOnTop(m.checked) },
-    { label: 'Start with this computer', type: 'checkbox', checked: store.settings().openAtLogin, click: (m) => setLogin(m.checked) },
+    { label: 'Show the island', click: () => { if (!island) createIsland(); else island.showInactive(); } },
+    { label: 'Hide the island', click: () => island && island.hide() },
     { type: 'separator' },
-    { label: 'Settings (Discord, app)…', click: () => openSetup(ORIGIN + '/settings.html') },
-    { label: 'Spotify sign-in…', click: () => openSetup(ORIGIN + '/spotify.html') },
-    { label: 'YouTube Music sign-in…', click: () => openSetup(ORIGIN + '/youtube.html') },
+    { label: 'Set up (opens in your browser)…', click: () => openGuide('index') },
+    { label: 'Spotify…', click: () => openGuide('spotify') },
+    { label: 'YouTube Music…', click: () => openGuide('youtube') },
+    { label: 'Discord…', click: () => openGuide('discord') },
     { type: 'separator' },
+    { label: 'Start with this computer', type: 'checkbox', checked: store.settings().openAtLogin, click: (m) => applySettings({ openAtLogin: m.checked }) },
     { label: 'Quit', click: () => { quitting = true; app.quit(); } }
   ]);
   tray.setContextMenu(menu());
-  tray.on('click', toggleWidget);
+  tray.on('click', () => { if (!island) createIsland(); else if (island.isVisible()) island.webContents.send('island-poke'); else island.showInactive(); });
   tray.refresh = () => tray.setContextMenu(menu());
 }
 
-function setOnTop(on) { store.setSettings({ alwaysOnTop: !!on }); if (win) win.setAlwaysOnTop(!!on, 'floating'); sendAll('settings', store.settings()); if (tray) tray.refresh(); }
-function setLogin(on) { store.setSettings({ openAtLogin: !!on }); try { app.setLoginItemSettings({ openAtLogin: !!on }); } catch { /* not on this system */ } sendAll('settings', store.settings()); if (tray) tray.refresh(); }
+function applySettings(patch) {
+  const before = store.settings(), now = store.setSettings(patch);
+  if ('openAtLogin' in patch) { try { app.setLoginItemSettings({ openAtLogin: !!now.openAtLogin }); } catch { /* not here */ } if (tray) tray.refresh(); }
+  if (now.discordId !== before.discordId) presence.connect(now.discordId);
+  if (now.presence !== before.presence) presence.setEnabled(now.presence);
+  if ('channels' in patch) bot.refresh().catch(() => {});
+  sendAll('settings', publicSettings());
+  return now;
+}
+function publicSettings() { const s = store.settings(); return { alwaysOnTop: s.alwaysOnTop, openAtLogin: s.openAtLogin, discordId: !!s.discordId, presence: s.presence, webhook: !!s.webhook, bot: !!s.botToken, channels: s.channels }; }
+function setKv(key, value) { if (store.set(key, value)) sendAll('kv-changed', { key, value: value == null ? null : String(value) }); }
 
-/* ---------- what the pages may ask ---------- */
+/* ---------- what the island may ask ---------- */
 function fromApp(e) { try { const o = new URL(e.senderFrame.url).origin; return o === ORIGIN || o === GOOGLE; } catch { return false; } }
 function wire() {
   ipcMain.on('kv-get', (e, key) => { e.returnValue = fromApp(e) ? store.get(String(key)) : null; });
@@ -110,60 +123,51 @@ function wire() {
     if (!fromApp(e) || !store.set(String(key), value)) return;
     for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed() && w.webContents !== e.sender) w.webContents.send('kv-changed', { key: String(key), value: value == null ? null : String(value) });
   });
-  ipcMain.handle('settings-get', (e) => (fromApp(e) ? store.settings() : null));
-  ipcMain.handle('settings-set', (e, patch) => {
-    if (!fromApp(e) || !patch || typeof patch !== 'object') return null;
-    const before = store.settings(), clean = {};
-    if ('alwaysOnTop' in patch) setOnTop(patch.alwaysOnTop);
-    if ('openAtLogin' in patch) setLogin(patch.openAtLogin);
-    if ('closeToTray' in patch) clean.closeToTray = !!patch.closeToTray;
-    if ('discordId' in patch) clean.discordId = String(patch.discordId || '').trim();
-    if ('presence' in patch) clean.presence = !!patch.presence;
-    if ('webhook' in patch) clean.webhook = String(patch.webhook || '').trim();
-    const now = store.setSettings(clean);
-    if (now.discordId !== before.discordId) presence.connect(now.discordId);
-    if (now.presence !== before.presence) presence.setEnabled(now.presence);
-    sendAll('settings', now);
-    return now;
+  ipcMain.handle('settings-get', (e) => (fromApp(e) ? publicSettings() : null));
+  ipcMain.on('island', (e, what, a, b) => {
+    if (!fromApp(e) || !island || BrowserWindow.fromWebContents(e.sender) !== island) return;
+    if (what === 'size') placeIsland(a, b);
+    else if (what === 'full') {   // the whole screen (the full view, DJ mode, Discord), and back
+      if (a && !full) { full = island.getBounds(); const d = screen.getDisplayMatching(full).bounds; island.setBounds(d); island.focus(); }
+      else if (!a && full) { const back = full; full = null; island.setBounds(back); }
+    } else if (what === 'focus') island.focus();
+    else if (what === 'blur') island.blur();
   });
-  ipcMain.on('window', (e, what, a, b) => {
-    const w = BrowserWindow.fromWebContents(e.sender); if (!w || !fromApp(e)) return;
-    if (what === 'minimize') w.minimize();
-    else if (what === 'close') w.close();
-    else if (what === 'on-top') setOnTop(a);
-    else if (what === 'fit' && w === win && !w.isFullScreen() && !fullBounds) {   // the window follows the player's size
-      const width = Math.max(300, Math.min(1200, Math.round(a))), height = Math.max(120, Math.min(1400, Math.round(b)));
-      const cur = w.getBounds(); if (cur.width === width && cur.height === height) return;
-      const wa = screen.getDisplayMatching(cur).workArea;   // growing never pushes the widget off the screen
-      const x = Math.max(wa.x, Math.min(cur.x, wa.x + wa.width - width)), y = Math.max(wa.y, Math.min(cur.y, wa.y + wa.height - height));
-      w.setBounds({ x, y, width, height });
-    } else if (what === 'full' && w === win) {   // the full view / DJ mode covers the screen
-      if (a && !fullBounds) { fullBounds = w.getBounds(); const d = screen.getDisplayMatching(fullBounds).bounds; w.setResizable(true); w.setBounds(d); w.setAlwaysOnTop(true, 'screen-saver'); }
-      else if (!a && fullBounds) { w.setBounds(fullBounds); fullBounds = null; w.setResizable(false); w.setAlwaysOnTop(store.settings().alwaysOnTop, 'floating'); }
-    } else if (what === 'open-setup') openSetup(String(a || ''));
-  });
+  ipcMain.on('open-guide', (e, what) => { if (fromApp(e)) openGuide(String(what || 'index')); });
   ipcMain.on('discord-update', (e, track) => { if (fromApp(e)) presence.update(track && typeof track === 'object' ? track : null); });
   ipcMain.handle('discord-share', (e, track) => (fromApp(e) ? discord.share(store.settings().webhook, track) : { ok: false, error: 'not allowed' }));
   ipcMain.handle('discord-status', () => lastStatus);
+  ipcMain.handle('discord-feed', () => bot.feed());
+  ipcMain.handle('discord-refresh', (e) => (fromApp(e) ? bot.refresh().catch((er) => ({ configured: true, messages: [], channels: [], error: er.message })) : null));
 }
-let lastStatus = { text: 'Starting…', ok: false };
 
 app.whenReady().then(async () => {
   store = createStore(app.getPath('userData'));
-  try { await server.start(path.join(__dirname, 'app')); }
+  presence = discord.createPresence({ onStatus: (st) => { lastStatus = st; sendAll('discord-status', st); } });
+  bot = createBot({ getToken: getBotToken, getChannels: () => store.settings().channels, onFeed: (f) => sendAll('discord-feed', f) });
+  const spotifyAuth = createSpotifyAuth({
+    getClientId: () => store.get('np-client'), redirectUri: ORIGIN + '/spotify/callback',
+    saveToken: (t) => setKv('np-spotify-v1', JSON.stringify(t))
+  });
+  const api = createApi({
+    origins: [ORIGIN, GOOGLE], store, spotifyAuth, bot, presence, applySettings, setKv, setBotToken,
+    hasBotToken: () => !!store.settings().botToken, presenceStatus: () => lastStatus
+  });
+  try { await server.start(path.join(__dirname, 'app'), server.PORT, api); }
   catch (e) {
     dialog.showErrorBox('integrationApp', `Port ${server.PORT} on this computer is in use (${e.code || e.message}). Is integrationApp already open? Close the other copy and try again.`);
     app.quit(); return;
   }
-  presence = discord.createPresence({ onStatus: (st) => { lastStatus = st; sendAll('discord-status', st); } });
   wire();
-  createWidget();
+  createIsland();
   buildTray();
   const s = store.settings();
   presence.setEnabled(s.presence);
   presence.connect(s.discordId);
+  if (s.botToken) bot.start();
+  // first run: nothing set up yet, so the set-up guide opens in your browser
+  if (!store.get('np-client') && !store.get('yt-client') && !s.discordId && !s.botToken) setTimeout(() => openGuide('index'), 1500);
 });
-app.on('second-instance', () => { if (win) { win.show(); win.focus(); } });
-app.on('before-quit', () => { quitting = true; if (store) store.flush(); if (presence) presence.stop(); });
+app.on('second-instance', () => { if (island) { island.showInactive(); island.webContents.send('island-poke'); } });
+app.on('before-quit', () => { quitting = true; if (store) store.flush(); if (presence) presence.stop(); if (bot) bot.stop(); });
 app.on('window-all-closed', () => { /* stays in the tray */ });
-app.on('activate', () => { if (!win) createWidget(); else win.show(); });

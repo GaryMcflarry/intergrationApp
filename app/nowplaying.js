@@ -335,7 +335,7 @@ window.NowPlaying = (function () {
     try { if (window.top !== window && window.top.location.origin === location.origin && window.top.documentPictureInPicture) return window.top; } catch (e) { }
     return window.top === window && 'documentPictureInPicture' in window ? window : null;
   })();
-  var SETUP = new URL('spotify.html', HERE).href;   // the one sign-in page: the only address to register with Spotify
+  var SETUP = window.NP_SETUP_URL || new URL('spotify.html', HERE).href;   // the one sign-in page: the only address to register with Spotify
   function cid() { try { return localStorage.getItem('np-client') || ''; } catch (e) { return ''; } }
   function corner() { try { return localStorage.getItem('np-corner') || 'tr'; } catch (e) { return 'tr'; } }
 
@@ -1556,6 +1556,21 @@ window.NowPlaying = (function () {
       enabled: function () { return enabled; },
       setEnabled: function (on) { enabled = on; try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) { } if (!on) { hide(); setHere(false); } poll(); },
       onStatus: function (fn) { statusFns.push(fn); fn(status, note); },
+      // for the island: which source, open or closed, the full view, the buttons, what plays
+      setSource: function (s2) { if (s2 === 'sp' || (s2 === 'yt' && yt)) setSrc(s2, true); },
+      source: function () { return src; },
+      setBig: function (b) { setBig(!!b); }, isBig: function () { return box.classList.contains('big'); },
+      openView: function (v) { if (v === 'dj') djEnter(); else if (v === 'yt') setView('yt'); else openNow(); },
+      closeView: function () { if (view) djLeave(); },
+      view: function () { return view; },
+      control: function (s2, what) {
+        if (s2 === 'yt') { if (yt) yt[what === 'play' ? 'toggle' : what](); return; }
+        var b = $('.np-' + (what === 'play' ? 'play' : what)); if (b) b.click();
+      },
+      like: function () { $('.np-like').click(); }, liked: function () { return !!liked; },
+      signedIn: function () { return !!(load() && load().refresh); },
+      spotifyTrack: function () { return currentTrack(); },
+      ytTrack: function () { return yt ? yt.track() : null; },
       _state: function (s) { S = s; at = Date.now(); if (s && s.item) { lastPlay = Date.now(); paint(); show(); } else hide(); }   // for testing
     };
   }

@@ -1,36 +1,36 @@
 'use strict';
-/* What the app's pages may ask of the app (nothing else of the computer): shared values, settings, the window, Discord. */
+/* What the island may ask of the app (nothing else of the computer): shared values, the window, the set-up guides, Discord. */
 const { contextBridge, ipcRenderer } = require('electron');
 
-const listeners = { kv: [], settings: [], discord: [] };
-ipcRenderer.on('kv-changed', (_e, d) => listeners.kv.forEach((f) => f(d)));
-ipcRenderer.on('settings', (_e, d) => listeners.settings.forEach((f) => f(d)));
-ipcRenderer.on('discord-status', (_e, d) => listeners.discord.forEach((f) => f(d)));
+const on = {};
+function listen(channel) { on[channel] = []; ipcRenderer.on(channel, (_e, d) => on[channel].forEach((f) => f(d))); return (f) => { on[channel].push(f); }; }
+const onKv = listen('kv-changed'), onSettings = listen('settings'), onStatus = listen('discord-status'), onFeed = listen('discord-feed');
+const onReflow = listen('island-reflow'), onPoke = listen('island-poke');
 
 contextBridge.exposeInMainWorld('desktop', {
   isApp: true,
   kv: {
     get: (key) => ipcRenderer.sendSync('kv-get', String(key)),
     set: (key, value) => ipcRenderer.send('kv-set', String(key), value == null ? null : String(value)),
-    onChange: (f) => { listeners.kv.push(f); }
+    onChange: onKv
   },
-  settings: {
-    get: () => ipcRenderer.invoke('settings-get'),
-    set: (patch) => ipcRenderer.invoke('settings-set', patch),
-    onChange: (f) => { listeners.settings.push(f); }
+  settings: { get: () => ipcRenderer.invoke('settings-get'), onChange: onSettings },
+  island: {
+    size: (w, h) => ipcRenderer.send('island', 'size', Number(w), Number(h)),
+    full: (on2) => ipcRenderer.send('island', 'full', !!on2),
+    focus: () => ipcRenderer.send('island', 'focus'),
+    blur: () => ipcRenderer.send('island', 'blur'),
+    onReflow, onPoke
   },
-  window: {
-    minimize: () => ipcRenderer.send('window', 'minimize'),
-    close: () => ipcRenderer.send('window', 'close'),
-    setOnTop: (on) => ipcRenderer.send('window', 'on-top', !!on),
-    fit: (w, h) => ipcRenderer.send('window', 'fit', Number(w), Number(h)),
-    full: (on) => ipcRenderer.send('window', 'full', !!on),
-    openSetup: (url) => ipcRenderer.send('window', 'open-setup', String(url))
-  },
+  openGuide: (what) => ipcRenderer.send('open-guide', String(what || 'index')),
+  window: { openSetup: (url) => ipcRenderer.send('open-guide', String(url)) },   // the player's set-up links: their guide, in the browser
   discord: {
     update: (track) => ipcRenderer.send('discord-update', track || null),
     share: (track) => ipcRenderer.invoke('discord-share', track),
     status: () => ipcRenderer.invoke('discord-status'),
-    onStatus: (f) => { listeners.discord.push(f); }
+    onStatus,
+    feed: () => ipcRenderer.invoke('discord-feed'),
+    refresh: () => ipcRenderer.invoke('discord-refresh'),
+    onFeed
   }
 });

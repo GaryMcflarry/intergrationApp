@@ -1,0 +1,40 @@
+/* The set-up guides: plain, readable pages that open in your browser. */
+:root { color-scheme: dark; --bg: #07080d; --panel: #11121b; --line: #262838; --ink: #f2f0ff; --soft: #c4c0dc; --muted: #8a86a6; --acc: #9aa3ff; --sp: #1ed760; --yt: #ff4e45; --dc: #5865f2;
+  --f-display: "Chakra Petch", "Segoe UI", system-ui, sans-serif; --f-mono: "Space Mono", ui-monospace, Menlo, monospace; }
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; background: radial-gradient(90% 60% at 50% 0%, #15142a, var(--bg) 70%) fixed; color: var(--ink); font-family: var(--f-display); line-height: 1.55; }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+main { width: min(760px, calc(100% - 32px)); margin: 0 auto; padding: 36px 0 60px; display: grid; gap: 18px; }
+a { color: var(--acc); }
+header.top { display: flex; align-items: center; gap: 14px; }
+header.top .logo { width: 42px; height: 42px; flex: none; }
+h1 { margin: 0; font-size: clamp(1.7rem, 5vw, 2.4rem); letter-spacing: .01em; line-height: 1.1; }
+h1 small { display: block; font-family: var(--f-mono); font-size: .7rem; letter-spacing: .2em; color: var(--muted); font-weight: 400; text-transform: uppercase; margin-bottom: 4px; }
+.lead { margin: 0; color: var(--soft); font-size: 1.02rem; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; display: grid; gap: 12px; }
+.card h2 { margin: 0; font-size: 1.15rem; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.st { font-family: var(--f-mono); font-size: .72rem; color: var(--muted); font-weight: 400; text-align: right; }
+.st.ok { color: var(--sp); }
+ol { margin: 0; padding-left: 1.3em; color: var(--soft); display: grid; gap: 8px; }
+ol b, p b { color: var(--ink); }
+code, .mono { font-family: var(--f-mono); font-size: .8rem; color: var(--ink); background: #1b1d2b; padding: 2px 6px; border-radius: 6px; word-break: break-all; }
+label.f { display: grid; gap: 6px; font-family: var(--f-mono); font-size: .74rem; color: var(--soft); }
+input[type=text], input[type=password] { font: inherit; font-family: var(--f-mono); font-size: .84rem; color: var(--ink); background: #0b0c13; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; }
+input:focus { outline: none; border-color: var(--acc); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button, .btn { font: inherit; font-weight: 700; letter-spacing: .04em; padding: 9px 18px; border-radius: 999px; border: 1px solid var(--line); background: #1b1d2b; color: var(--ink); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+button:hover, .btn:hover { border-color: var(--acc); }
+.go { border-color: color-mix(in srgb, var(--accent, var(--acc)) 70%, transparent); background: color-mix(in srgb, var(--accent, var(--acc)) 16%, #10111a); }
+.msg { margin: 0; font-family: var(--f-mono); font-size: .76rem; color: #ffd38a; min-height: 1em; }
+.msg.ok { color: var(--sp); }
+.note { margin: 0; font-size: .88rem; color: var(--muted); }
+.check { display: flex; gap: 10px; align-items: center; cursor: pointer; color: var(--soft); }
+.check input { accent-color: var(--acc); width: 16px; height: 16px; }
+.svc { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: center; }
+.svc svg { width: 44px; height: 44px; }
+.svc p { margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
+.chans { display: grid; gap: 12px; }
+.chans fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin: 0; display: grid; gap: 6px; }
+.chans legend { padding: 0 6px; color: var(--soft); font-weight: 700; }
+footer { color: var(--muted); font-size: .85rem; display: flex; gap: 14px; flex-wrap: wrap; }

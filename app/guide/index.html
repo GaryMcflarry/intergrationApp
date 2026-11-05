@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set up integrationApp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="guide.css">
+</head>
+<body>
+<main>
+  <header class="top"><span class="logo" id="logo"></span><h1><small>integrationApp</small>Set up your island</h1></header>
+  <p class="lead">integrationApp lives at the <b>top of your screen</b> as a small black island. It shows what is playing on Spotify or YouTube Music (or Discord, when nothing plays). <b>Hover</b> or <b>click</b> it for the three tabs and what is playing; <b>drag it down</b> (or press ⌄) for the full player or your Discord channels; press ⛶ to cover the whole screen. Pin keeps it open; Esc or dragging up closes it.</p>
+
+  <section class="card">
+    <div class="svc"><span id="i-sp"></span><div><h2>Spotify</h2><p id="s-sp">Checking…</p></div><a class="btn go" style="--accent:var(--sp)" href="spotify.html">Set up</a></div>
+  </section>
+  <section class="card">
+    <div class="svc"><span id="i-yt"></span><div><h2>YouTube Music</h2><p id="s-yt">Checking…</p></div><a class="btn go" style="--accent:var(--yt)" id="ytlink" href="youtube.html">Set up</a></div>
+  </section>
+  <section class="card">
+    <div class="svc"><span id="i-dc"></span><div><h2>Discord</h2><p id="s-dc">Checking…</p></div><a class="btn go" style="--accent:var(--dc)" href="discord.html">Set up</a></div>
+  </section>
+
+  <section class="card">
+    <h2>The app</h2>
+    <label class="check"><input type="checkbox" id="login"> Start integrationApp with this computer</label>
+    <p class="note">The island sits on top of other windows. The tray icon (by the clock) shows or hides it, opens this guide, and quits the app.</p>
+    <p class="msg" id="msg"></p>
+  </section>
+  <footer><span>These pages are served by integrationApp on this computer only.</span></footer>
+</main>
+<script src="guide.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = IA.$;
+  $('logo').innerHTML = IA.ICON.app; $('i-sp').innerHTML = IA.ICON.sp; $('i-yt').innerHTML = IA.ICON.yt; $('i-dc').innerHTML = IA.ICON.dc;
+  $('ytlink').href = 'http://localhost:' + location.port + '/guide/youtube.html';   // Google signs in on localhost
+  function ok(el, yes, text) { el.textContent = text; el.style.color = yes ? 'var(--sp)' : ''; }
+  IA.status().then(function (s) {
+    ok($('s-sp'), s.spotify.connected, s.spotify.connected ? 'Connected.' : s.spotify.client ? 'Client ID added: connect your account.' : 'Not set up yet.');
+    var lib = s.youtube.library; ok($('s-yt'), !!lib, lib ? 'Connected: ' + lib.playlists + ' playlists, ' + lib.liked + ' liked songs.' : 'Not set up yet.');
+    var d = s.discord, parts = [];
+    if (d.appId) parts.push('Rich Presence ' + (d.presenceStatus && d.presenceStatus.ok ? 'connected' : 'set up'));
+    if (d.bot) parts.push('messages from ' + d.channels.length + ' channel' + (d.channels.length === 1 ? '' : 's'));
+    if (d.webhook) parts.push('sharing to a channel');
+    ok($('s-dc'), parts.length > 0, parts.length ? parts.join(' · ') + '.' : 'Not set up yet.');
+    $('login').checked = !!s.app.openAtLogin;
+  }, function (e) { IA.say($('msg'), e.message); });
+  $('login').addEventListener('change', function () {
+    IA.api('/api/app', { openAtLogin: this.checked }).then(function () { IA.say($('msg'), 'Saved.', true); }, function (e) { IA.say($('msg'), e.message); });
+  });
+})();
+</script>
+</body>
+</html>

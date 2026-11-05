@@ -1,10 +1,9 @@
-/* In the app, the widget (127.0.0.1) and the YouTube sign-in page (localhost) are different addresses, so each has its
-   own browser storage. These few values are kept by the app instead and copied into each page, so a sign-in in one
-   window reaches the others (like Worlds' database did for Lively). Nothing happens outside the app. */
+/* The sign-ins are kept by the app (a sign-in made in your browser, through the guide pages, reaches it there) and copied
+   into the island's storage, where the player looks for them; the player's own renewals go back to the app. */
 (function () {
   'use strict';
   var D = window.desktop; if (!D || !D.kv) return;
-  var KEYS = ['yt-library-v1', 'yt-client', 'yt-token'], set0 = Storage.prototype.setItem, rem0 = Storage.prototype.removeItem;
+  var KEYS = ['yt-library-v1', 'yt-client', 'yt-token', 'np-spotify-v1', 'np-client'], set0 = Storage.prototype.setItem, rem0 = Storage.prototype.removeItem;
   KEYS.forEach(function (k) {
     try {
       var v = D.kv.get(k);

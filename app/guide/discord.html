@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Discord · integrationApp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="guide.css">
+</head>
+<body style="--acc:#9aa3ff">
+<main>
+  <header class="top"><span class="logo" id="logo"></span><h1><small>integrationApp · set up</small>Discord</h1></header>
+  <p class="lead">Three things, each optional: <b>show what you play</b> on your Discord profile, <b>see the latest messages</b> from your servers in the island, and <b>share a song</b> to a channel. All three start with one free Discord application of your own.</p>
+
+  <section class="card">
+    <h2>1 · Your Discord application</h2>
+    <ol>
+      <li>Open the <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">Discord developer portal</a> and press <b>New Application</b>. Its name is what Discord shows as “Listening to …”, so call it something like <i>Music</i>.</li>
+      <li>On <b>General Information</b>, copy the <b>Application ID</b> here.</li>
+    </ol>
+    <label class="f">Application ID<input type="text" id="appid" spellcheck="false" autocomplete="off" inputmode="numeric" placeholder="a long number"></label>
+    <label class="check"><input type="checkbox" id="pres"> Show what I am playing on my Discord profile (Rich Presence) <span class="st" id="pst"></span></label>
+    <p class="note">Rich Presence goes through the Discord app on this computer, so keep it running.</p>
+  </section>
+
+  <section class="card">
+    <h2>2 · Messages in the island <span class="st" id="bst"></span></h2>
+    <p class="note">Discord does not let apps read your own messages or DMs. Instead, a <b>bot</b> of yours joins your server and reads the channels you pick; the island shows the latest.</p>
+    <ol>
+      <li>In your application, open <b>Bot</b>. Under <b>Privileged Gateway Intents</b>, switch on <b>Message Content Intent</b> (so it can see what messages say) and save.</li>
+      <li>Press <b>Reset Token</b>, copy the token and paste it below. Keep it secret: the app stores it encrypted and never shows it again.</li>
+      <li>Add the bot to your server: <a id="invite" target="_blank" rel="noopener" href="#">invite it</a> (enter the Application ID above first). It only asks to view channels and read their history.</li>
+    </ol>
+    <label class="f">Bot token<input type="password" id="token" spellcheck="false" autocomplete="off" placeholder="paste the token"></label>
+    <div class="row"><button type="button" id="savebot">Save the token</button><button type="button" id="rmbot" hidden>Remove the bot</button></div>
+    <div id="pick" hidden>
+      <p class="note">Pick up to 8 channels to follow:</p>
+      <div class="chans" id="chans"></div>
+      <div class="row"><button type="button" class="go" id="savech">Follow these channels</button><button type="button" id="reload">Reload the list</button></div>
+    </div>
+    <p class="msg" id="bmsg" aria-live="polite"></p>
+  </section>
+
+  <section class="card">
+    <h2>3 · Share a song to a channel</h2>
+    <ol>
+      <li>In Discord, open a channel's <b>Edit Channel → Integrations → Webhooks → New Webhook</b>, then <b>Copy Webhook URL</b>.</li>
+      <li>Paste it here. The island's <b>Share to Discord</b> buttons then post the song there.</li>
+    </ol>
+    <label class="f">Webhook URL<input type="password" id="hook" spellcheck="false" autocomplete="off" placeholder="https://discord.com/api/webhooks/…"></label>
+    <div class="row"><button type="button" id="savehook">Save</button></div>
+    <p class="msg" id="msg" aria-live="polite"></p>
+  </section>
+  <footer><a href="./">← All set-up</a></footer>
+</main>
+<script src="guide.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = IA.$, chosen = [];
+  $('logo').innerHTML = IA.ICON.dc;
+  function invite() { var id = $('appid').value.trim(); $('invite').href = /^\d{15,22}$/.test(id) ? 'https://discord.com/oauth2/authorize?client_id=' + id + '&scope=bot&permissions=66560' : '#'; }
+  function paint(s) {
+    var d = s.discord; chosen = d.channels.slice();
+    $('pres').checked = d.presence;
+    IA.say($('pst'), d.presenceStatus ? d.presenceStatus.text : '', d.presenceStatus && d.presenceStatus.ok);
+    IA.say($('bst'), d.bot ? 'bot ' + (d.botName || 'added') + ' · ' + d.channels.length + ' channel' + (d.channels.length === 1 ? '' : 's') : 'not set up', d.bot);
+    $('rmbot').hidden = !d.bot; $('pick').hidden = !d.bot;
+    if (d.feedError) IA.say($('bmsg'), d.feedError);
+    $('hook').placeholder = d.webhook ? 'saved (paste a new one to replace it)' : 'https://discord.com/api/webhooks/…';
+    if (d.bot && !$('chans').childNodes.length) loadChannels();
+    return s;
+  }
+  function refresh() { return IA.status().then(paint, function (e) { IA.say($('msg'), e.message); }); }
+  refresh();
+  $('appid').addEventListener('input', invite);
+  $('appid').addEventListener('change', function () { IA.api('/api/discord', { appId: this.value.trim() }).then(function () { IA.say($('msg'), 'Application ID saved.', true); setTimeout(refresh, 1500); }, function (e) { IA.say($('msg'), e.message); }); });
+  $('pres').addEventListener('change', function () { IA.api('/api/discord', { presence: this.checked }).then(function () { setTimeout(refresh, 1200); }); });
+  $('savebot').addEventListener('click', function () {
+    IA.say($('bmsg'), 'Checking the token with Discord…');
+    IA.api('/api/discord/bot', { token: $('token').value.trim() }).then(function (r) { $('token').value = ''; IA.say($('bmsg'), 'Saved: the bot is ' + r.name + '. Now invite it and pick channels.', true); refresh(); loadChannels(); }, function (e) { IA.say($('bmsg'), e.message); });
+  });
+  $('rmbot').addEventListener('click', function () { IA.api('/api/discord/bot', { token: '' }).then(function () { $('chans').textContent = ''; IA.say($('bmsg'), 'Removed.', true); refresh(); }); });
+  function loadChannels() {
+    var box = $('chans'); box.textContent = 'Loading the servers the bot is in…';
+    IA.api('/api/discord/channels').then(function (r) {
+      box.textContent = '';
+      if (!r.guilds.length) { box.textContent = 'The bot is not in any server yet: invite it (step 2.3), then press Reload the list.'; return; }
+      r.guilds.forEach(function (g) {
+        var fs = document.createElement('fieldset'), lg = document.createElement('legend'); lg.textContent = g.name; fs.appendChild(lg);
+        if (g.error) { var p = document.createElement('p'); p.className = 'note'; p.textContent = g.error; fs.appendChild(p); }
+        g.channels.forEach(function (c) {
+          var l = document.createElement('label'); l.className = 'check'; var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = c.id; cb.checked = chosen.indexOf(c.id) >= 0;
+          l.appendChild(cb); l.appendChild(document.createTextNode('#' + c.name)); fs.appendChild(l);
+        });
+        box.appendChild(fs);
+      });
+    }, function (e) { box.textContent = ''; IA.say($('bmsg'), e.message); });
+  }
+  $('reload').addEventListener('click', loadChannels);
+  $('savech').addEventListener('click', function () {
+    var ids = Array.prototype.map.call(document.querySelectorAll('#chans input:checked'), function (c) { return c.value; });
+    if (ids.length > 8) { IA.say($('bmsg'), 'Pick at most 8 channels.'); return; }
+    IA.api('/api/discord/channels', { ids: ids }).then(function () { IA.say($('bmsg'), 'Following ' + ids.length + ' channel' + (ids.length === 1 ? '' : 's') + ': the island shows their latest messages.', true); refresh(); }, function (e) { IA.say($('bmsg'), e.message); });
+  });
+  $('savehook').addEventListener('click', function () { IA.api('/api/discord', { webhook: $('hook').value.trim() }).then(function () { $('hook').value = ''; IA.say($('msg'), 'Saved.', true); refresh(); }, function (e) { IA.say($('msg'), e.message); }); });
+})();
+</script>
+</body>
+</html>

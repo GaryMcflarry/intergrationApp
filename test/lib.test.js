@@ -76,18 +76,19 @@ test('Store: settings persist; only the shared keys can be stored', () => {
   const s = createStore(dir);
   s.setSettings({ discordId: '42', nope: 1 });
   assert.equal(s.set('yt-library-v1', '{"pls":[]}'), true);
-  assert.equal(s.set('np-spotify-v1', 'secret'), false);
+  assert.equal(s.set('np-spotify-v1', '{"refresh":"r"}'), true);   // the Spotify sign-in is shared with the island
+  assert.equal(s.set('anything-else', 'x'), false);
   s.flush();
   const again = createStore(dir);
   assert.equal(again.settings().discordId, '42');
   assert.equal('nope' in again.settings(), false);
   assert.equal(again.get('yt-library-v1'), '{"pls":[]}');
-  assert.equal(again.get('np-spotify-v1'), null);
+  assert.equal(again.get('anything-else'), null);
 });
 
 test('Server: serves the app on its own addresses only, nothing outside the app folder', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ia-app-'));
-  fs.writeFileSync(path.join(root, 'index.html'), '<p>hi</p>');
+  fs.writeFileSync(path.join(root, 'island.html'), '<p>hi</p>');
   fs.writeFileSync(path.join(path.dirname(root), 'secret.txt'), 'no');
   const port = 43000 + Math.floor(Math.random() * 500);
   const srv = await server.start(root, port);

@@ -1,11 +1,24 @@
 # integrationApp
 
-A desktop music widget for **Spotify** and **YouTube Music**, with **Discord**. It is the music player from the Worlds wallpapers, as an Electron app that sits on your desktop.
+A **Dynamic Island for your desktop**: a small black pill at the top of the screen for **Spotify**, **YouTube Music** and **Discord**.
 
-- **Spotify**: what is playing, with controls, seek, volume, shuffle, repeat and like; Queue, Search, Library (playlists open so you can pick a song inside, with Play and Shuffle; Liked Songs) and Devices. Each song's ⛶ button opens the **full view**: the cover as a card that tilts toward the mouse, over the whole screen. **DJ mode** finds new songs in a vibe (from your own playlists' genres, a genre and era, or any typed genre) and keeps adding them. Liked songs show a filled heart.
-- **YouTube Music**: a tab beside Spotify in the same layout: your liked songs, YouTube's mixes from them, your playlists and search. Starting one pauses the other.
-- **Discord**: **Rich Presence** shows *Listening to* the song and artist on your profile, with the cover, the time and a button to open it; **Share to Discord** posts the song to a channel through a webhook.
-- **The widget**: a small frameless window that fits the player, always on top if you like, with a tray icon (show / hide, always on top, start with the computer, settings, quit). The full view and DJ mode cover the screen.
+- **The pill** shows the icon and what is playing (with a little equaliser), whichever of Spotify or YouTube Music started last. When nothing plays it shows **Discord** and how many new messages there are.
+- **Hover, click or drag it down** and it opens into **three tabs** (Spotify · YouTube Music · Discord) with what is playing and its controls, or Discord's latest messages and whether your profile shows what you play.
+- **Open it further** (drag down again, or ⌄) for the full player (queue, search, library with playlists to open and shuffle, devices, likes, the DJ) or your Discord channels.
+- **Cover the whole screen** (⛶) with any of the three: the music's full view (the cover as a card that tilts toward the mouse), DJ mode, or Discord.
+- **Pin** keeps it open; **drag up**, **Esc**, the pill button, or clicking elsewhere closes it.
+
+## Set-up happens in your browser
+
+Anything not connected yet shows a **Set up** button in the island; it opens a guide in your browser (also from the tray icon, and on first start). The guides connect each service and hand the result to the app:
+
+- **Spotify**: an app of your own in the Spotify developer dashboard, with the redirect address `http://127.0.0.1:43210/spotify/callback`; you then sign in on Spotify's own page in your browser (its Google / Apple buttons work there). Add your Spotify account under the app's *User Management*.
+- **YouTube Music**: a Google *Web application* client with `http://localhost:43210` as an authorized JavaScript origin; sign in on the guide (read-only) to bring in your playlists and liked songs.
+- **Discord**: one Discord application of your own for three optional things. **Rich Presence** (its Application ID) shows *Listening to* on your profile through the Discord app. **Messages**: Discord does not let apps read your own messages or DMs, so a **bot** of yours (token, *Message Content* intent, invited to your server) reads the channels you pick, and the island shows the latest. **Share**: a channel webhook for the *Share to Discord* buttons.
+
+The guides and sign-ins are served by the app on this computer only (`127.0.0.1` / `localhost`, port 43210). Sign-ins stay on this computer; the bot token is encrypted with the system keychain where there is one.
+
+**Playback** happens on your Spotify devices (phone, the Spotify app, a web player); the island controls them. Controlling playback needs Spotify Premium. YouTube Music plays in YouTube's own player inside the island.
 
 ## Run it
 
@@ -15,18 +28,6 @@ Requires Node.js 20 or newer.
 npm install
 npm start
 ```
-
-## Set up (once)
-
-Open the tray icon's menu (or the widget's ⚙):
-
-1. **Spotify sign-in**: create an app in the [Spotify developer dashboard](https://developer.spotify.com/dashboard) (tick *Web API*), add the redirect address the page shows (`http://127.0.0.1:43210/spotify.html`), paste its Client ID and sign in. If you use the Worlds wallpapers, add this address to the same Spotify app.
-2. **YouTube Music sign-in**: in the Google Cloud console enable *YouTube Data API v3*, add yourself as a test user, create a *Web application* OAuth client with `http://localhost:43210` under *Authorized JavaScript origins*, paste its Client ID and sign in. It is read-only.
-3. **Settings → Discord**: for Rich Presence, create an application in the [Discord developer portal](https://discord.com/developers/applications) (its name is what Discord shows, e.g. *Music*) and paste its Application ID; the Discord app must be running on this computer. For sharing, create a channel webhook (Edit Channel → Integrations → Webhooks) and paste its URL.
-
-The app's pages are served on this computer only, at `127.0.0.1:43210` (Spotify's sign-in must return to a `127.0.0.1` address) and `localhost:43210` (where Google allows signing in). Sign-ins stay on this computer.
-
-**Playback** happens on your Spotify devices (phone, the Spotify app, a web player): the app controls them. Playing inside the app itself would need Widevine, which Electron does not include. Playing, skipping and DJ mode need Spotify Premium.
 
 ## Build installers
 
@@ -41,12 +42,17 @@ Installers go to `dist/`. They are unsigned, so Windows SmartScreen and macOS Ga
 ## Layout
 
 ```text
-main.js           the app: widget window, tray, sign-in windows, settings, Discord
-preload.js        what the pages may ask of the app
-lib/server.js     serves app/ on 127.0.0.1 and localhost, port 43210
-lib/store.js      settings and the values shared between windows (a JSON file in the app's data folder)
-lib/discord.js    Rich Presence and webhook sharing
-app/              the widget (index.html), the player (nowplaying.js, ytmusic.js), sign-in and settings pages
+main.js              the app: the island window, the tray, guides in the browser, sign-ins, Discord
+preload.js           what the island may ask of the app
+lib/server.js        serves app/ on 127.0.0.1 and localhost, port 43210 (and hands /api, /spotify to lib/api.js)
+lib/api.js           the local API the guide pages use
+lib/spotify-auth.js  Spotify sign-in through your browser (PKCE)
+lib/discord.js       Rich Presence and webhook sharing
+lib/discordbot.js    the latest messages from your channels, through your bot
+lib/store.js         settings and sign-ins (a JSON file in the app's data folder)
+app/island.html      the island
+app/nowplaying.js    the player (Spotify, the full view, DJ mode); app/ytmusic.js: YouTube Music
+app/guide/           the set-up guides
 ```
 
 ## Checks
