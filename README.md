@@ -43,6 +43,8 @@ npm run dist:linux   # Linux: AppImage
 
 Installers go to `dist/`. The setup page detects the Windows installer when Astrum runs from this checkout. The default builds are unsigned. On a Mac, run Astrum from source with `npm ci` and `npm start`, or build a DMG on that Mac.
 
+Run **Test desktop installers** in GitHub Actions to build and smoke-test a Windows x64 installer and separate DMGs for Apple silicon and Intel. Successful runs attach test artifacts. The workflow does not publish them as releases. For public distribution, configure GitHub Actions signing secrets. A supported Windows signing certificate uses `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD`. macOS uses a Developer ID Application certificate (`MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`) and App Store Connect notarization credentials (`APPLE_API_KEY_B64`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`). The Mac test builds use ad-hoc signing when those credentials are absent. [Electron Builder signing documentation](https://www.electron.build/docs/features/code-signing/)
+
 ## Host the product page on Dokploy
 
 1. Commit and push this checkout to GitHub, including the new `deploy/` files and the landing page assets. Verify that `deploy/Dockerfile` appears on the branch in GitHub. Publish a GitHub Release tagged `v1.0.0` with the Windows installer attached as `Astrum-Setup-1.0.0.exe`. Use `dist/Astrum Setup 1.0.0.exe` from the verified build and rename the upload copy. The installer is unsigned.
@@ -50,7 +52,7 @@ Installers go to `dist/`. The setup page detects the Windows installer when Astr
 3. Set **Build Type** to `Dockerfile`, **Dockerfile Path** to `deploy/Dockerfile`, and **Docker Context Path** to `.`. In **Environment**, turn off **Create Environment File** and leave runtime variables empty. Leave **Docker Build Stage** empty. Deploy after the release asset is publicly downloadable.
 4. Point your domain's DNS at your Dokploy server. In **Domains**, enter the hostname, set **Path** to `/` and **Container Port** to `8080`, then enable **HTTPS** with **Let's Encrypt**. Open the domain and test **Download for Windows**.
 
-The container serves the product page and a checksum-verified installer at `/download/windows`. Account setup and device preferences use the desktop app on each computer. For a different installer, set `ASTRUM_WINDOWS_URL` and `ASTRUM_WINDOWS_SHA256` under Dokploy **Build Arguments** before redeploying. The URL must be an HTTPS download that the build server can access without credentials. Use the checksum of the exact file you upload, for example `Get-FileHash -Algorithm SHA256` on Windows.
+The container serves the product page, public setup instructions, and a checksum-verified installer at `/download/windows`. The page uses relative links, so a Dokploy domain variable is unnecessary. Account connections and OAuth callbacks use the desktop app on each computer. For a different installer, set `ASTRUM_WINDOWS_URL` and `ASTRUM_WINDOWS_SHA256` under Dokploy **Build Arguments** before redeploying. The URL must be an HTTPS download that the build server can access without credentials. Use the checksum of the exact file you upload, for example `Get-FileHash -Algorithm SHA256` on Windows.
 
 [Dokploy build settings](https://docs.dokploy.com/docs/core/applications/build-type) · [Domain setup](https://docs.dokploy.com/docs/core/domains)
 

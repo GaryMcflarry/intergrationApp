@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Set up Spotify, YouTube, and Discord in Astrum on your computer.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'">
+<title>Setup guides · Astrum</title>
+<link rel="stylesheet" href="guide.css">
+</head>
+<body>
+<main>
+  <header class="top"><h1><small>Astrum</small>Setup guides</h1></header>
+  <p class="lead">Install and open Astrum, then choose <b>Set up</b> in the app or its tray menu. Enter your account details in the setup window Astrum opens on your computer.</p>
+  <nav class="row" aria-label="Setup guides">
+    <a class="btn" href="#spotify">Spotify</a>
+    <a class="btn" href="#youtube">YouTube</a>
+    <a class="btn" href="#discord">Discord</a>
+  </nav>
+  <section class="card" id="spotify" aria-labelledby="spotify-title">
+    <h2 id="spotify-title">Spotify</h2>
+    <ol>
+      <li>Create an app in the <a href="https://developer.spotify.com/dashboard">Spotify developer dashboard</a> and select <b>Web API</b>.</li>
+      <li>Add <code>http://127.0.0.1:43210/spotify/callback</code> to the app’s <b>Redirect URIs</b>. In <b>User Management</b>, make sure your Spotify account has access.</li>
+      <li>In Astrum’s Spotify setup, enter the <b>Client ID</b> and choose <b>Connect Spotify</b>. Playback controls require Spotify Premium.</li>
+    </ol>
+  </section>
+  <section class="card" id="youtube" aria-labelledby="youtube-title">
+    <h2 id="youtube-title">YouTube</h2>
+    <p class="note">You can watch a video by pasting its link into Astrum. Connect Google for search, playlists, and liked videos.</p>
+    <ol>
+      <li>Create a <a href="https://console.cloud.google.com/projectcreate">Google Cloud project</a> and enable <b>YouTube Data API v3</b>.</li>
+      <li>In <b>Google Auth Platform</b>, set up the consent screen and add your account as a test user if the app is in testing.</li>
+      <li>Create a <b>Web application</b> OAuth client with <code>http://localhost:43210</code> as an authorized JavaScript origin. Enter the <b>Client ID</b> in Astrum’s YouTube setup and sign in.</li>
+    </ol>
+  </section>
+  <section class="card" id="discord" aria-labelledby="discord-title">
+    <h2 id="discord-title">Discord</h2>
+    <ol>
+      <li>Create an application in the <a href="https://discord.com/developers/applications">Discord developer portal</a>. Enter its <b>Application ID</b> in Astrum’s Discord setup to enable Rich Presence.</li>
+      <li>To read selected channels, add a bot, enable <b>Message Content Intent</b>, and invite it to your server. Enter the bot token only in the local setup window.</li>
+      <li>To share tracks, create a channel webhook in Discord and paste its URL into the local setup window.</li>
+    </ol>
+  </section>
+  <footer><a href="./">← Astrum overview and downloads</a></footer>
+</main>
+</body>
+</html>

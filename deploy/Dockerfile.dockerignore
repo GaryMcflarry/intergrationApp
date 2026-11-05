@@ -8,6 +8,7 @@ app/**
 !app/guide/
 app/guide/**
 !app/guide/index.html
+!app/guide/setup.html
 !app/guide/guide.css
 !app/guide/guide.js
 !app/guide/landing.js

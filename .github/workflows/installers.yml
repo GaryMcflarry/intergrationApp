@@ -1,0 +1,130 @@
+name: Test desktop installers
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/installers.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
+      - name: Build, install, and start Astrum
+        shell: pwsh
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          npx --no-install electron-builder --win nsis --x64 --publish never
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $installer = Get-ChildItem dist -Filter '*Setup*.exe' | Select-Object -First 1
+          if (!$installer) { throw 'Windows installer was not built' }
+          if ($env:WIN_CSC_LINK -and (Get-AuthenticodeSignature $installer.FullName).Status -ne 'Valid') {
+            throw 'Windows installer signature is invalid'
+          }
+          $target = Join-Path $env:RUNNER_TEMP 'astrum-installed'
+          $install = Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$target" -Wait -PassThru
+          if ($install.ExitCode) { throw "Installer exited with $($install.ExitCode)" }
+          $app = Start-Process -FilePath (Join-Path $target 'Astrum.exe') -PassThru
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              if ($app.HasExited) { throw 'Astrum exited during launch' }
+              try {
+                $status = Invoke-RestMethod 'http://127.0.0.1:43210/api/status' -TimeoutSec 2
+                if ($null -ne $status.spotify -and $null -ne $status.app) { $ready = $true; break }
+              } catch { Start-Sleep -Seconds 1 }
+            }
+            if (!$ready) { throw 'Astrum did not start its local setup server' }
+          } finally {
+            Stop-Process -Id $app.Id -ErrorAction SilentlyContinue
+          }
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: Astrum-Windows-x64
+          path: dist/*Setup*.exe
+          if-no-files-found: error
+
+  mac:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - run: npm ci
+      - name: Build, mount, and start Astrum
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_B64: ${{ secrets.APPLE_API_KEY_B64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [[ -n "$CSC_LINK" ]]; then
+            : "${APPLE_API_KEY_B64:?Missing Apple notarization key}" "${APPLE_API_KEY_ID:?Missing Apple key ID}" "${APPLE_API_ISSUER:?Missing Apple issuer}"
+            umask 077
+            export APPLE_API_KEY="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+            printf '%s' "$APPLE_API_KEY_B64" | base64 -D > "$APPLE_API_KEY"
+            args+=(-c.forceCodeSigning=true)
+          else
+            args+=(-c.mac.identity=- -c.mac.hardenedRuntime=false)
+          fi
+          npx --no-install electron-builder --mac dmg "--$ARCH" --publish never "${args[@]}"
+          dmg=(dist/*.dmg)
+          hdiutil verify "${dmg[0]}"
+          mount="$RUNNER_TEMP/astrum-mounted"
+          target="$RUNNER_TEMP/astrum-installed/Astrum.app"
+          hdiutil attach "${dmg[0]}" -nobrowse -readonly -mountpoint "$mount"
+          pid=
+          trap 'if [[ -n "$pid" ]]; then kill "$pid" 2>/dev/null || true; fi; hdiutil detach "$mount"' EXIT
+          ditto "$mount/Astrum.app" "$target"
+          codesign --verify --deep --strict "$target"
+          if [[ -n "$CSC_LINK" ]]; then
+            spctl --assess --type execute "$target"
+            xcrun stapler validate "$target"
+          fi
+          "$target/Contents/MacOS/Astrum" > "$RUNNER_TEMP/astrum.log" 2>&1 &
+          pid=$!
+          for ((i = 0; i < 30; i++)); do
+            if ! kill -0 "$pid" 2>/dev/null; then break; fi
+            if status=$(curl -fsS --max-time 2 http://127.0.0.1:43210/api/status 2>/dev/null) &&
+              printf '%s' "$status" | jq -e '.spotify and .app' >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/astrum.log"
+          exit 1
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: Astrum-macOS-${{ matrix.arch }}
+          path: dist/*.dmg
+          if-no-files-found: error

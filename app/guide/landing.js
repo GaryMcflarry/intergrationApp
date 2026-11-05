@@ -3,11 +3,11 @@
   'use strict';
   var $ = IA.$;
   var local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
-  var port = local ? location.port : '43210';
-  var loopback = 'http://127.0.0.1:' + port + '/guide/';
-  $('sp-link').href = loopback + 'spotify.html';
-  $('yt-link').href = 'http://localhost:' + port + '/guide/youtube.html';
-  $('dc-link').href = loopback + 'discord.html';
+  if (local) {
+    $('sp-link').href = 'spotify.html';
+    $('yt-link').href = 'http://localhost:' + location.port + '/guide/youtube.html';
+    $('dc-link').href = 'discord.html';
+  }
   [['i-sp', 'sp'], ['i-yt', 'yt'], ['i-dc', 'dc'], ['preview-yt', 'yt'], ['preview-dc', 'dc']].forEach(function (icon) {
     $(icon[0]).innerHTML = IA.ICON[icon[1]];
   });
@@ -18,7 +18,10 @@
     var bytes = Number(response.headers.get('Content-Length'));
     download.hidden = false;
     downloadNote.textContent = 'Windows installer' + (bytes > 0 ? ' · ' + Math.round(bytes / 1048576) + ' MB' : '');
-  }).catch(function () { downloadNote.textContent = 'A Windows installer is unavailable from this copy.'; });
+  }).catch(function () {
+    downloadNote.textContent = local ? 'This copy of Astrum does not include the installer.' : 'The Windows download is temporarily unavailable.';
+    $('download-fallback').hidden = false;
+  });
 
   if (!local) return;
   function status(id, connected, message) {
