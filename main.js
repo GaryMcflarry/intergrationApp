@@ -23,6 +23,8 @@ app.setPath('userData', path.join(app.getPath('appData'), 'integrationApp'));
 app.userAgentFallback = app.userAgentFallback.replace(/\s?Electron\/\S+/, '').replace(/\s?(integrationApp|Astrum)\/\S+/i, '');
 if (!app.requestSingleInstanceLock()) app.quit();
 
+const MAC = process.platform === 'darwin';
+const NOTCH_OK = MAC || process.env.ASTRUM_NOTCH === '1';   // In the menu bar is a Mac's (ASTRUM_NOTCH=1 tries it elsewhere)
 let island = null, tray = null, store = null, presence = null, bot = null, quitting = false, full = null, lastStatus = { text: 'Starting…', ok: false };
 
 function sendAll(channel, payload) { for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload); }
@@ -107,7 +109,8 @@ function pinToScreen() {
   store.setSettings({ bounds: anchor }); placeIsland();
 }
 // Stay on top of other apps (or be an ordinary window that apps can cover)
-function applyOnTop() { if (island) island.setAlwaysOnTop(!!store.settings().alwaysOnTop, 'screen-saver'); }
+// (in the menu bar it is always on top: below other windows it could not be seen there)
+function applyOnTop() { const s = store.settings(); if (island) island.setAlwaysOnTop(!!s.alwaysOnTop || s.placement === 'notch', 'screen-saver'); }
 
 /* ---------- the shortcut: calls the island from anywhere (Ctrl+Shift+Space, or ⌘⇧Space on a Mac, by default) ---------- */
 const SHORTCUTS = new Set(['CommandOrControl+Shift+Space', 'Alt+Space', 'CommandOrControl+Shift+M', '']);
@@ -160,11 +163,14 @@ function createIsland() {
   islandSize = { width: 300, height: place.PILL + place.TOP + place.BOTTOM }; growUp = null;
   const saved = store.settings().bounds;
   anchor = saved && Number.isFinite(saved.fx) && Number.isFinite(saved.fy) ? saved : null;
+  if (store.settings().placement === 'notch') anchor = place.notchAt(anchorDisplay());
+  else if (anchor && anchor.notch) anchor = place.topMiddle(anchorDisplay());
   const first = windowBounds(); lastPlace = '';
   island = new BrowserWindow({
     x: first.x, y: first.y, width: first.width, height: first.height,
     frame: false, transparent: true, resizable: false, movable: false, minimizable: false, maximizable: false, fullscreenable: false,
     hasShadow: false, skipTaskbar: true, alwaysOnTop: true, show: false, title: 'Astrum', backgroundColor: '#00000000',
+    enableLargerThanScreen: NOTCH_OK,   // macOS: lets it sit over the menu bar (In the menu bar), where windows are otherwise kept below it
     icon: nativeImage.createFromDataURL(ICON),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false }
   });
@@ -182,12 +188,24 @@ function createIsland() {
   island.on('closed', () => { stopDrag(); island = null; full = null; });
 }
 
+/* macOS › the menu bar: what plays is written beside Astrum's icon there; clicking it calls the island (down from the
+   notch, In the menu bar), and the right button gives the menu */
+function trayTitle(t) {
+  if (!tray || !MAC) return;
+  const clip = (v, n) => { v = String(v || '').replace(/\s+/g, ' ').trim(); return v.length > n ? v.slice(0, n - 1) + '…' : v; };
+  const text = t && t.playing && t.title ? clip(t.title, 26) + (t.artist ? ' – ' + clip(t.artist, 18) : '') : '';
+  tray.setTitle(text ? ' ' + text : '', { fontType: 'monospacedDigit' });
+  tray.setToolTip(text ? 'Astrum · ' + text : 'Astrum');
+}
 function buildTray() {
-  tray = new Tray(nativeImage.createFromDataURL(ICON));
+  const img = nativeImage.createFromDataURL(ICON);
+  tray = new Tray(MAC ? img.resize({ width: 18, height: 18 }) : img);
   tray.setToolTip('Astrum');
   const menu = () => Menu.buildFromTemplate([
     { label: 'Show the island', click: () => { if (!island) createIsland(); else island.showInactive(); } },
     { label: 'Hide the island', click: () => island && island.hide() },
+    ...(NOTCH_OK ? [{ label: 'In the menu bar (over the notch)', type: 'checkbox', checked: store.settings().placement === 'notch',
+      click: (m) => { applySettings({ placement: m.checked ? 'notch' : 'screen' }); } }] : []),
     { type: 'separator' },
     { label: 'Set up (opens in your browser)…', click: () => openGuide('index') },
     { label: 'Spotify…', click: () => openGuide('spotify') },
@@ -197,6 +215,12 @@ function buildTray() {
     { label: 'Start with this computer', type: 'checkbox', checked: store.settings().openAtLogin, click: (m) => applySettings({ openAtLogin: m.checked }) },
     { label: 'Quit', click: () => { quitting = true; app.quit(); } }
   ]);
+  if (MAC) {   // a click calls the island; the menu is on the right button (a menu set on a Mac's tray takes every click)
+    tray.on('click', () => summon());
+    tray.on('right-click', () => tray.popUpContextMenu(menu()));
+    tray.refresh = () => {};
+    return;
+  }
   tray.setContextMenu(menu());
   tray.on('click', () => { if (!island) createIsland(); else if (island.isVisible()) island.webContents.send('island-poke'); else island.showInactive(); });
   tray.refresh = () => tray.setContextMenu(menu());
@@ -211,10 +235,13 @@ function applySettings(patch) {
   if ('alwaysOnTop' in patch) applyOnTop();
   if ('shortcut' in patch) registerShortcut();
   if (patch.placement === 'screen' && before.placement !== 'screen') pinToScreen();
+  if (patch.placement === 'notch' && before.placement !== 'notch') { anchor = place.notchAt(anchorDisplay()); store.setSettings({ bounds: anchor }); placeIsland(); }
+  if (patch.placement && patch.placement !== 'notch' && before.placement === 'notch') pinToScreen();   // down from the menu bar, to the top middle
+  if ('placement' in patch) applyOnTop();
   sendAll('settings', publicSettings());
   return now;
 }
-function publicSettings() { const s = store.settings(); return { alwaysOnTop: s.alwaysOnTop, placement: s.placement, shortcut: s.shortcut, shortcutOk, mac: process.platform === 'darwin', openAtLogin: s.openAtLogin, discordId: !!s.discordId, presence: s.presence, webhook: !!s.webhook, bot: !!s.botToken, channels: s.channels }; }
+function publicSettings() { const s = store.settings(); return { alwaysOnTop: s.alwaysOnTop, placement: s.placement, shortcut: s.shortcut, shortcutOk, mac: MAC, notchOk: NOTCH_OK, openAtLogin: s.openAtLogin, discordId: !!s.discordId, presence: s.presence, webhook: !!s.webhook, bot: !!s.botToken, channels: s.channels }; }
 function setKv(key, value) { if (store.set(key, value)) sendAll('kv-changed', { key, value: value == null ? null : String(value) }); }
 
 /* ---------- what the island may ask ---------- */
@@ -229,7 +256,7 @@ function wire() {
   ipcMain.handle('settings-set', (e, patch) => {   // the island's own settings: where it stays, on top or not, the shortcut, starting with the computer
     if (!fromApp(e) || !patch || typeof patch !== 'object') return null;
     const clean = {};
-    if (['spot', 'screen', 'roam'].includes(patch.placement)) clean.placement = patch.placement;
+    if (['spot', 'screen', 'roam'].concat(NOTCH_OK ? ['notch'] : []).includes(patch.placement)) clean.placement = patch.placement;
     if ('alwaysOnTop' in patch) clean.alwaysOnTop = !!patch.alwaysOnTop;
     if (typeof patch.shortcut === 'string' && SHORTCUTS.has(patch.shortcut)) clean.shortcut = patch.shortcut;
     if ('openAtLogin' in patch) clean.openAtLogin = !!patch.openAtLogin;
@@ -264,7 +291,11 @@ function wire() {
     return true;
   });
   ipcMain.on('open-guide', (e, what) => { if (fromApp(e)) openGuide(String(what || 'index')); });
-  ipcMain.on('discord-update', (e, track) => { if (fromApp(e)) presence.update(track && typeof track === 'object' ? track : null); });
+  ipcMain.on('discord-update', (e, track) => {   // what plays: Discord's Rich Presence, and (Mac) the menu bar
+    if (!fromApp(e)) return;
+    const t = track && typeof track === 'object' ? track : null;
+    presence.update(t); trayTitle(t);
+  });
   ipcMain.handle('discord-share', (e, track) => (fromApp(e) ? discord.share(store.settings().webhook, track) : { ok: false, error: 'not allowed' }));
   ipcMain.handle('discord-status', () => lastStatus);
   ipcMain.handle('discord-feed', () => bot.feed());

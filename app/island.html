@@ -37,6 +37,14 @@ body.ov #isl, body.ov .aura { top: var(--iy, 6px); left: var(--ix, 0px); bottom:
 body.ov #isl[data-l="3"] { top: 0; left: 0; }
 body.ov .np.in-app.mini-page { top: calc(var(--iy, 6px) + 46px) !important; left: calc(var(--ix, 0px) + var(--w, 440px) / 2) !important; }
 body.noanim #isl, body.noanim .aura { transition: none !important; }
+/* macOS > In the menu bar: the island hangs from the top of the screen like the notch grown wider; closed it is the menu
+   bar's height and black like the notch, with the icon on one side of it and the bars and grip on the other */
+body.notch #isl:not([data-l="3"]) { border-top-left-radius: 0; border-top-right-radius: 0; }
+body.notch #isl[data-l="0"] { height: max(var(--bar, 24px), 32px) !important; background: #000 !important; box-shadow: 0 6px 18px rgba(0, 0, 0, .3) !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+body.notch #isl[data-l="0"]::after, body.notch .aura { display: none; }
+body.notch .pill { height: max(var(--bar, 24px), 32px); padding: 0 16px 0 14px; }
+body.notch .pill .pt, body.notch .pill .idle { visibility: hidden; }
 #isl, .aura { will-change: width, height, left, top; }
 /* glass: a frosted, see-through island with light catching its edges (Settings › Island › Glass) */
 html.glass #isl:not([data-l="3"]) {
@@ -336,7 +344,8 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
           <div class="row stack"><span>Where it stays</span><span class="segs s-place" role="group" aria-label="Where it stays">
             <button type="button" data-v="spot" title="Stays where you drop it (drag it by its grip)">This spot</button>
             <button type="button" data-v="screen" title="Stays at the top middle of the screen you drop it on">This screen</button>
-            <button type="button" data-v="roam" title="Goes to the screen your mouse is on">Follow the mouse</button></span></div>
+            <button type="button" data-v="roam" title="Goes to the screen your mouse is on">Follow the mouse</button>
+            <button type="button" data-v="notch" title="Hangs from the top of the screen, over the notch; what plays is written in the menu bar" hidden>Menu bar</button></span></div>
           <button type="button" class="row s-top" role="switch" aria-checked="true"><span>Stay on top of other apps</span><i class="tg"></i></button>
           <div class="row stack"><span>Shortcut to call it</span><span class="segs s-key" role="group" aria-label="Shortcut"></span><small class="s-keynote"></small></div>
         </div>
@@ -438,6 +447,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   }
   var measure = document.createElement('canvas').getContext('2d');
   function pillWidth() {
+    if (ov && ov.notch) return 330;   // the menu bar: wide enough to show either side of a notch (the song is in the menu bar)
     if (isl.dataset.kind === 'app') return 172;
     measure.font = '600 12.5px "Chakra Petch", "Segoe UI", system-ui, sans-serif';
     var w = measure.measureText($('.ptx').dataset.text || '').width;
@@ -711,7 +721,9 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     }
     up = !!(p && p.up);
     if (p && p.overlay) {   // moved (or first placed): straight to the new spot, no slide inside the window
-      ov = p; body.classList.add('ov', 'noanim'); body.classList.remove('up'); size();
+      ov = p; body.classList.add('ov', 'noanim'); body.classList.remove('up');
+      body.classList.toggle('notch', !!p.notch); document.documentElement.style.setProperty('--bar', (p.bar || 24) + 'px');
+      size();
       requestAnimationFrame(function () { requestAnimationFrame(function () { body.classList.remove('noanim'); }); });
     } else { ov = null; body.classList.remove('ov'); body.classList.toggle('up', up); }
   });
@@ -733,6 +745,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   function paintPosition(st) {
     if (!st) return;
     $$('.s-place button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === (st.placement || 'spot'))); });
+    $('.s-place [data-v="notch"]').hidden = !st.notchOk;   // a Mac's
     $('.s-top').setAttribute('aria-checked', String(st.alwaysOnTop !== false));
     var keys = $('.s-key'), opts = st.mac ? [['CommandOrControl+Shift+Space', '⌘⇧Space'], ['Alt+Space', '⌥Space'], ['', 'Off']] : [['CommandOrControl+Shift+Space', 'Ctrl+Shift+Space'], ['Alt+Space', 'Alt+Space'], ['', 'Off']];
     if (!keys.childNodes.length) opts.forEach(function (o) {

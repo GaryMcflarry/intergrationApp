@@ -11,6 +11,7 @@ A **Dynamic Island for your desktop**: a small black pill at the top of the scre
 - **Smooth on Windows and macOS**: the island's window keeps one size and the island opens and closes inside it with CSS alone (no window resizing, which flickers); the empty parts let clicks through to your desktop. On Linux the window follows the island's size.
 - **Glass** (Settings → Island): a frosted, see-through island with light on its edges; **Glass clarity** sets how much of the desktop shows through. (Windows and macOS do not let an app blur the desktop behind a custom shape, so it is see-through and tinted rather than blurred.)
 - **Settings → Position**: *This spot* (where you drop it), *This screen* (the top middle of the screen you drop it on) or *Follow the mouse* (the closed pill goes to the screen your mouse is on); **Stay on top of other apps** on or off; and a **shortcut** to call it from anywhere: **Ctrl+Shift+Space** on Windows, **⌘⇧Space** on a Mac (or Alt/⌥+Space, or off). Press it again to close it.
+- **On a Mac: Menu bar** (Settings → Position, or right-click Astrum's menu bar icon): the island hangs from the top middle of the screen, black like the notch and around it, and opens downwards from there. The song playing is written beside Astrum's icon in the menu bar; clicking that icon drops the island open, and the right button gives the menu.
 
 ## Set-up happens in your browser
 
