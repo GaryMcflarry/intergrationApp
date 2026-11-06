@@ -57,8 +57,13 @@ body.notch #isl:not([data-l="3"]) { border-top-left-radius: 0; border-top-right-
 html body.notch #isl[data-l="0"] { height: max(var(--bar, 24px), 32px); background: #000; box-shadow: 0 6px 18px rgba(0, 0, 0, .3); backdrop-filter: none; -webkit-backdrop-filter: none; }
 html body.notch #isl[data-l="0"]::after, body.notch .aura { display: none; }
 body.notch .pill { height: max(var(--bar, 24px), 32px); padding: 0 16px 0 14px; }
-body.notch .pill .pt, body.notch .pill .idle { visibility: hidden; }
-body.notch .grip, body.notch .pill .eq { display: none; }   /* Menu bar mode: it lives on the notch, so there is nothing to drag */
+/* the song's name on the left of the notch, the bars on its right (--nw: the notch's width; the island is placed so the
+   gap sits under it); no grip: it lives on the notch, so there is nothing to drag */
+body.notch .pill .pt { flex: 0 1 auto; max-width: 210px; }
+body.notch .pill .pt:not(.mq) { -webkit-mask: none; mask: none; }
+body.notch .pill .idle { display: none !important; }
+body.notch .pill .nsp { display: block; }
+body.notch .grip { display: none; }
 /* the notch glow: while music plays, light in the accent (and pink, and cyan) spills from under the notch; a Discord
    message makes it pulse blue */
 .glow { position: absolute; left: 10%; right: 10%; bottom: 0; height: 2px; border-radius: 2px; pointer-events: none; opacity: 0; z-index: 2;
@@ -192,6 +197,7 @@ body.moving, body.moving * { cursor: grabbing !important; }
 .ic .star { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--acc) 70%, transparent)); }
 .pt { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; font-weight: 600; font-size: 12.5px; letter-spacing: .01em; -webkit-mask: linear-gradient(90deg, #000 85%, transparent); mask: linear-gradient(90deg, #000 85%, transparent); }
 .pt span { display: inline-block; }
+.nsp { display: none; flex: none; width: var(--nw, 0px); margin: 0 auto; }
 .pt.mq span { animation: mq var(--mqd, 12s) ease-in-out infinite alternate; }
 @keyframes mq { 0%, 15% { transform: none; } 85%, 100% { transform: translateX(var(--mq, 0)); } }
 .eq { display: flex; align-items: flex-end; gap: 2px; height: 14px; flex: none; }
@@ -389,6 +395,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   <div class="lv pill on" title="Hover, click or drag down to open">
     <span class="ic"></span>
     <span class="pt"><span class="ptx"></span></span>
+    <span class="nsp" aria-hidden="true"></span>
     <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
     <span class="idle" role="img" aria-label="Astrum"><span class="ch" style="--i:0"><i></i><b>a</b></span><span class="ch" style="--i:1"><i></i><b>s</b></span><span class="ch" style="--i:2"><i></i><b>t</b></span><span class="ch" style="--i:3"><i></i><b>r</b></span><span class="ch" style="--i:4"><i></i><b>u</b></span><span class="ch" style="--i:5"><i></i><b>m</b></span></span>
     <b class="badge" hidden></b>
@@ -576,11 +583,19 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   }
   var measure = document.createElement('canvas').getContext('2d');
   function pillWidth() {
-    if (ov && ov.notch) return 330;   // the menu bar: wide enough to show either side of a notch (the song is in the menu bar)
-    if (isl.dataset.kind === 'app') return 172;
     measure.font = '600 12.5px "Chakra Petch", "Segoe UI", system-ui, sans-serif';
     var w = measure.measureText($('.ptx').dataset.text || '').width;
+    if (ov && ov.notch) {   // the menu bar: the icon and the name left of the notch, the bars (and the badge) right of it
+      var nl = notchLeft(w);
+      return Math.round(nl + notchW() + ($('.eq').offsetParent ? 9 + 18 : 0) + ($('.badge').hidden ? 0 : 9 + 18) + 16);
+    }
+    if (isl.dataset.kind === 'app') return 172;
     return Math.round(Math.max(190, Math.min(360, 9 + 20 + 9 + w + 9 + 18 + 9 + 12 + 14 + ($('.badge').hidden ? 0 : 26))));   // icon, name, bars, grip
+  }
+  // a notched Mac has a tall menu bar (37 px or so): the gap for its notch; otherwise there is no notch to go round
+  function notchW() { return ov && ov.notch && ov.bar >= 30 ? 210 : 0; }
+  function notchLeft(textW) {   // the pill's part left of the notch: padding, icon, gap, the name (up to 210 px), gap
+    return 14 + 20 + 9 + Math.ceil(Math.min(210, (textW || 0) + 6)) + 9;
   }
   function marquee() {
     var pt = $('.pt'), sp = $('.ptx'), d = sp.scrollWidth - pt.clientWidth;
@@ -768,6 +783,10 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   function placeVars(w, h) {
     var st = document.documentElement.style;
     var left = Math.round(Math.max(ov.left + 6, Math.min(ov.right - w - 6, ov.cx - w / 2)));   // whole on its screen, near a side too
+    if (ov.notch && level === 0 && notchW()) {   // closed on a notch: placed so the gap between the name and the bars sits under it
+      measure.font = '600 12.5px "Chakra Petch", "Segoe UI", system-ui, sans-serif';
+      left = Math.round(ov.cx - notchW() / 2 - notchLeft(measure.measureText($('.ptx').dataset.text || '').width));
+    }
     var top = ov.up ? Math.round(winH() - ov.bottom - h) : ov.top;                         // grows away from the edge it sits on
     st.setProperty('--ix', left + 'px'); st.setProperty('--iy', top + 'px');
   }
@@ -923,6 +942,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     if (p && p.overlay) {   // moved (or first placed): straight to the new spot, no slide inside the window
       ov = p; body.classList.add('ov', 'noanim'); body.classList.remove('up');
       body.classList.toggle('notch', !!p.notch); body.classList.toggle('ovup', !!p.up); document.documentElement.style.setProperty('--bar', (p.bar || 24) + 'px');
+      document.documentElement.style.setProperty('--nw', (p.notch && p.bar >= 30 ? 210 : 0) + 'px');
       size();
       requestAnimationFrame(function () { requestAnimationFrame(function () { body.classList.remove('noanim'); }); });
     } else { ov = null; body.classList.remove('ov', 'ovup'); body.classList.toggle('up', up); }
