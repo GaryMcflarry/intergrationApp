@@ -190,21 +190,10 @@ function createIsland() {
   island.on('closed', () => { stopDrag(); island = null; full = null; });
 }
 
-/* macOS › the menu bar: what plays is written beside Astrum's icon there; clicking it calls the island (down from the
-   notch, In the menu bar), and the right button gives the menu */
-let lastTrack = null;
-function trayTitle(t) {
-  if (t !== undefined) lastTrack = t; else t = lastTrack;
-  if (!tray || !MAC) return;
-  if (store.settings().placement !== 'notch') t = null;   // Menu bar mode is one switch: off, the menu bar shows only the icon
-  const clip = (v, n) => { v = String(v || '').replace(/\s+/g, ' ').trim(); return v.length > n ? v.slice(0, n - 1) + '…' : v; };
-  const text = t && t.playing && t.title ? clip(t.title, 26) + (t.artist ? ' – ' + clip(t.artist, 18) : '') : '';
-  tray.setTitle(text ? ' ' + text : '', { fontType: 'monospacedDigit' });
-  tray.setToolTip(text ? 'Astrum · ' + text : 'Astrum');
-}
+/* the tray: on a Mac, a plain white star in the menu bar (a template image, lib/trayicon.js) that just sits there; clicking
+   it calls the island, and the right button gives the menu. Elsewhere, the app's icon. */
 function buildTray() {
-  const img = nativeImage.createFromDataURL(ICON);
-  tray = new Tray(MAC ? img.resize({ width: 18, height: 18 }) : img);
+  tray = new Tray(MAC ? require('./lib/trayicon').menuBarIcon(nativeImage) : nativeImage.createFromDataURL(ICON));
   tray.setToolTip('Astrum');
   const menu = () => Menu.buildFromTemplate([
     { label: 'Show the island', click: () => { if (!island) createIsland(); else island.showInactive(); } },
@@ -242,7 +231,7 @@ function applySettings(patch) {
   if (patch.placement === 'screen' && before.placement !== 'screen') pinToScreen();
   if (patch.placement === 'notch' && before.placement !== 'notch') { anchor = place.notchAt(anchorDisplay()); store.setSettings({ bounds: anchor }); placeIsland(); }
   if (patch.placement && patch.placement !== 'notch' && before.placement === 'notch') pinToScreen();   // down from the menu bar, to the top middle
-  if ('placement' in patch) { applyOnTop(); trayTitle(); if (tray) tray.refresh(); }
+  if ('placement' in patch) { applyOnTop(); if (tray) tray.refresh(); }
   sendAll('settings', publicSettings());
   return now;
 }
@@ -313,10 +302,10 @@ function wire() {
     return true;
   });
   ipcMain.on('open-guide', (e, what) => { if (fromApp(e)) openGuide(String(what || 'index')); });
-  ipcMain.on('discord-update', (e, track) => {   // what plays: Discord's Rich Presence, and (Mac) the menu bar
+  ipcMain.on('discord-update', (e, track) => {   // what plays: Discord's Rich Presence
     if (!fromApp(e)) return;
     const t = track && typeof track === 'object' ? track : null;
-    presence.update(t); trayTitle(t);
+    presence.update(t);
   });
   ipcMain.handle('discord-share', (e, track) => (fromApp(e) ? discord.share(store.settings().webhook, track) : { ok: false, error: 'not allowed' }));
   ipcMain.handle('discord-status', () => lastStatus);

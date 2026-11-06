@@ -1,19 +1,10 @@
-/* Now playing: a small Spotify player that sits over the wallpaper.
-   It signs in with Spotify's own login (PKCE: no secret, nothing stored anywhere but this browser), asks Spotify what is
-   playing every few seconds, and shows a glass card in a corner: cover, track and artist, back / play-pause / forward,
-   with a faint starfield drifting behind and the song's progress as a glowing trail. It opens up into bands: Now (the
-   cover with the album and year over it, the artist, seek, shuffle, repeat, like, volume), Queue (what plays next),
-   Search (play or queue anything), Explore (fresh songs by genre and era, and recommended playlists, picked by
-   tapping), Library (playlists, recently played, top songs and artists) and Devices (move playback, or make the
-   wallpaper itself a Spotify speaker). DJ mode covers the page: the wallpaper stays visible behind a large cover, and
-   the DJ keeps the queue topped up with new songs in the chosen vibe, so the music carries on by itself.
-
-   NowPlaying.attach(id, row)  puts the player on a wallpaper and wires its settings row (a switch per wallpaper).
-   Signing in happens once, on spotify.html (the one address to register with Spotify), and every wallpaper shares it.
+/* Now playing: Astrum's Spotify player (the island's expanded view). It asks Spotify what is playing (often while it is
+   open, rarely while it is closed, and just after a song should end), and opens into bands: Now (cover, seek, shuffle,
+   repeat, like, volume), Queue, Search (play or queue anything), Library (playlists, recently played, top songs and
+   artists) and Devices (move playback). Its full view shows a large cover; DJ mode keeps the queue topped up with new
+   songs in a chosen vibe, so the music carries on by itself. It tells the island what plays ('np:track') and when the
+   full view opens ('np:view'). Signing in happens in the app (main.js, the set-up guide); the sign-in is kept fresh here.
    Controls (play, skip, seek, volume, queue, devices ...) need Spotify Premium; reading what is playing does not. */
-/* Astrum: this is the Worlds wallpapers' player, running as a desktop widget. opts.app sets the app mode (the
-   player fills the widget, no wallpaper speaker: Electron has no Widevine), and it tells the app what is playing through
-   'np:track' events (for Discord) and when its full view opens ('np:view', so the window can go full screen). */
 window.NowPlaying = (function () {
   'use strict';
   var API = 'https://api.spotify.com/v1', AUTH = 'https://accounts.spotify.com';
@@ -39,7 +30,6 @@ window.NowPlaying = (function () {
     redo: '<svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5M19 4v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     wide: '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     narrow: '<svg viewBox="0 0 24 24"><path d="M19 11h-6V5M5 13h6v6M13 11l7-7M11 13l-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    pip: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.9"/><rect x="12" y="11" width="7" height="6" rx="1"/></svg>',
     full: '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     back: '<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -58,15 +48,8 @@ window.NowPlaying = (function () {
     '.np{position:fixed;z-index:20;width:min(340px,calc(100vw - 32px));color:#f5f3ff;font:500 13px/1.4 "Chakra Petch","Trebuchet MS",system-ui,sans-serif;--np-acc:#1ed760;--np-hi:color-mix(in srgb,var(--np-acc) 50%,#fff);--np-ink2:rgba(245,243,255,.62);--np-edge:rgba(255,255,255,.12);--np-r:18px;--np-r2:12px;opacity:0;transform:translateY(-8px) scale(.98);transition:opacity .45s ease,transform .45s ease;pointer-events:none;cursor:default}',
     '.np.on{opacity:1;transform:none;pointer-events:auto}',
     '.np.tr{top:16px;right:16px}.np.tl{top:16px;left:68px}.np.br{bottom:16px;right:16px}.np.bl{bottom:16px;left:16px}',
-    '/* the corner arrow: a slim tab at the screen edge that pulls the player out and tucks it away */',
     '.np.tabbed.tr,.np.tabbed.br{right:24px}.np.tabbed.tl,.np.tabbed.bl{left:24px}',
     '.np.on.tucked{opacity:0;pointer-events:none;transform:translateX(18px)}.np.on.tucked.tl,.np.on.tucked.bl{transform:translateX(-18px)}',
-    '.np-tab{position:fixed;z-index:21;width:16px;height:44px;padding:0;border:0;display:grid;place-items:center;cursor:pointer;color:#f5f3ff;background:rgba(18,12,26,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .4s ease,background .2s,width .2s}',
-    '.np-tab.on{opacity:.45;pointer-events:auto}.np-tab.on.site{opacity:.85;width:20px;height:52px}.np-tab.on:hover,.np-tab.on:focus-visible{opacity:1;width:20px}',
-    '.np-tab.tr{top:16px;right:0;border-radius:8px 0 0 8px}.np-tab.br{bottom:16px;right:0;border-radius:8px 0 0 8px}.np-tab.tl{top:16px;left:0;border-radius:0 8px 8px 0}.np-tab.bl{bottom:16px;left:0;border-radius:0 8px 8px 0}',
-    '.np-tab svg{width:12px;height:12px;transition:transform .3s ease}.np-tab.tr svg,.np-tab.br svg{transform:rotate(180deg)}.np-tab.out.tr svg,.np-tab.out.br svg{transform:none}.np-tab.out.tl svg,.np-tab.out.bl svg{transform:rotate(180deg)}',
-    '.np-tab.sk-normandy{border-radius:0;background:rgba(30,14,36,.55);color:var(--acc,#ffb38a);box-shadow:inset 1px 0 0 color-mix(in srgb,var(--acc,#ffb38a) 40%,transparent)}',
-    '.np-tab.sk-normandy.tl,.np-tab.sk-normandy.bl{box-shadow:inset -1px 0 0 color-mix(in srgb,var(--acc,#ffb38a) 40%,transparent)}',
     '.np-card{position:relative;overflow:hidden;border-radius:var(--np-r);background:rgba(10,10,20,.72);border:1px solid var(--np-edge);backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);box-shadow:0 10px 30px rgba(0,0,0,.35)}',
     '.np-card::before{content:"";position:absolute;inset:0;background:radial-gradient(120% 90% at 0% 0%,color-mix(in srgb,var(--np-acc) 30%,transparent),transparent 70%);pointer-events:none}',
     '/* a faint starfield drifting slowly behind everything */',
@@ -74,7 +57,7 @@ window.NowPlaying = (function () {
     '.np-in::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.6;background-image:radial-gradient(1px 1px at 12% 22%,#fff,transparent),radial-gradient(1px 1px at 68% 14%,rgba(255,255,255,.8),transparent),radial-gradient(1.4px 1.4px at 84% 62%,#fff,transparent),radial-gradient(1px 1px at 32% 78%,rgba(255,255,255,.7),transparent),radial-gradient(1px 1px at 52% 44%,rgba(255,255,255,.55),transparent),radial-gradient(1px 1px at 93% 90%,rgba(255,255,255,.7),transparent),radial-gradient(1.2px 1.2px at 5% 64%,rgba(255,255,255,.75),transparent);background-size:190px 130px;animation:np-drift 120s linear infinite}',
     '@keyframes np-drift{to{background-position:-190px 0}}',
     '.np-lk{position:absolute;left:46px;top:44px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:rgba(10,10,20,.85);color:var(--np-hi);box-shadow:0 0 0 1px rgba(255,255,255,.12),0 0 10px color-mix(in srgb,var(--np-acc) 50%,transparent);opacity:0;transform:scale(.5);transition:opacity .25s,transform .25s;pointer-events:none}',
-    '.np-lk svg{width:11px;height:11px;fill:currentColor}.np.is-liked .np-lk{opacity:1;transform:none}.np.sk-normandy .np-lk{left:36px;top:34px}.np.src-yt .np-lk{display:none}',
+    '.np-lk svg{width:11px;height:11px;fill:currentColor}.np.is-liked .np-lk{opacity:1;transform:none}.np.src-yt .np-lk{display:none}',
     '.np .np-heart.liked{color:var(--np-hi)}.np .np-heart.liked svg{filter:drop-shadow(0 0 6px color-mix(in srgb,var(--np-acc) 60%,transparent))}',
     '.np-mini{position:relative;display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 12px 15px}',
     '.np-art{width:48px;height:48px;border-radius:var(--np-r2);object-fit:cover;background:#222;display:block;box-shadow:0 2px 10px rgba(0,0,0,.45)}',
@@ -107,12 +90,12 @@ window.NowPlaying = (function () {
     '.np-more{position:relative;display:grid;grid-template-columns:minmax(0,1fr);gap:14px;padding:0 16px;max-height:0;overflow:hidden;opacity:0;transition:max-height .28s ease,opacity .2s ease,padding .28s ease}',
     '.np.big{width:min(400px,calc(100vw - 32px))}.np.big.wide{width:min(780px,calc(100vw - 56px))}',
     '.np{transition:opacity .45s ease,transform .45s ease,width .35s ease}',
-    '.np .np-wide,.np .np-pip{display:none}.np.big .np-wide,.np.can-pip .np-pip,.np.can-mini .np-sp .np-pip{display:grid}.np-dj .dj-pip{display:none}.np-dj.can-pip .dj-pip,.np-dj.can-mini:not(.m-yt) .dj-pip{display:grid}',
+    '.np .np-wide{display:none}.np.big .np-wide{display:grid}',
     '.np .np-add.done{color:var(--np-hi)}.np-dj .dj-save.done{color:var(--np-hi)}',
     '.np .np-resign{margin-left:auto;width:auto;height:auto;border-radius:0;padding:3px 0 6px;display:inline-flex;gap:5px;align-items:center;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--np-ink2)}',
     '.np .np-resign:hover{background:none;color:#fff}.np .np-resign svg{width:13px;height:13px;fill:none}.np .np-resign[hidden]{display:none}',
-    '/* mini.html: the player alone, filling a small popup window */',
-    '.np.mini-page{top:0!important;left:0!important;right:0!important;bottom:auto!important;width:100%!important;opacity:1!important;transform:none!important}.np.mini-page .np-card{border-radius:0;min-height:100vh}.np-tab.mini-page{display:none}',
+    '/* the player alone, filling the island */',
+    '.np.mini-page{top:0!important;left:0!important;right:0!important;bottom:auto!important;width:100%!important;opacity:1!important;transform:none!important}.np.mini-page .np-card{border-radius:0;min-height:100vh}',
     '.np.big .np-more{max-height:calc(100vh - 130px);overflow-y:auto;opacity:1;padding:2px 16px 18px;scrollbar-width:thin}',
     '.np.big .np-line{display:none}',
     '.np-bands{display:flex;justify-content:space-between;gap:4px;border-bottom:1px solid var(--np-edge)}',
@@ -162,43 +145,10 @@ window.NowPlaying = (function () {
     '.np-chips[hidden]{display:none}',
     '.np-q{font:inherit;font-size:13px;color:#fff;background:rgba(255,255,255,.07);border:1px solid var(--np-edge);border-radius:var(--np-r2);padding:10px 12px;width:100%;box-sizing:border-box}',
     '.np-q::placeholder{color:var(--np-ink2)}.np-q:focus{outline:none;border-color:color-mix(in srgb,var(--np-acc) 70%,transparent);box-shadow:0 0 12px color-mix(in srgb,var(--np-acc) 30%,transparent)}',
-    '.np-here{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;cursor:pointer;padding:12px;border-radius:var(--np-r2);box-shadow:inset 0 0 0 1px var(--np-edge)}',
-    '.np-here input{margin:2px 0 0;accent-color:var(--np-acc)}.np-here b{display:block;font-size:13px}.np-here small{display:block;font-size:11.5px;color:var(--np-ink2)}',
-    '.np-herenote{margin:0;font-size:11.5px;color:var(--np-hi)}.np-herenote:empty{display:none}',
     '.np.ro .np-btns button:not(.np-exp),.np.ro .np-ctl{display:none}',
     '.np.np-idle .np-btns,.np.np-idle .np-line,.np.np-idle .np-more{display:none}.np.np-idle{cursor:pointer}.np.np-idle .np-art{opacity:.75}',
     '.np-cta{display:block;text-decoration:none;color:inherit}.np-cta .np-mini{grid-template-columns:auto minmax(0,1fr)}',
     '.np-row{display:flex;justify-content:space-between;align-items:center;gap:10px}.np-row label{display:inline-flex;gap:8px;align-items:center;cursor:pointer}.np-row a{font-size:.85em;color:inherit;opacity:.8}',
-    '/* the Normandy skin, kept minimal: a hairline cut-corner outline in the page\'s colours, cover, title, artist and a hairline of progress; the buttons appear on hover */',
-    '.np.sk-normandy{width:min(300px,calc(100vw - 32px));--c-line:var(--line,#5e3366);--c-acc:var(--acc,#ffb38a);--c-ink:var(--ink,#fff1ea);--c-soft:var(--soft,#f3c9c0);--c-muted:var(--muted,#c08f9f);--np-acc:var(--c-acc);--np-hi:var(--c-acc);--np-ink2:var(--c-muted);--np-edge:color-mix(in srgb,var(--c-acc) 26%,transparent);--np-r:0;--np-r2:0;color:var(--c-ink);font-family:var(--f-display,"Chakra Petch",sans-serif)}',
-    '.np.sk-normandy .np-card{border:0;padding:1px;background:color-mix(in srgb,var(--c-acc) 38%,transparent);clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);box-shadow:none}',
-    '.np.sk-normandy .np-card::before{display:none}',
-    '.np.sk-normandy .np-in{background:rgba(30,14,36,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);clip-path:polygon(9.6px 0,100% 0,100% calc(100% - 9.6px),calc(100% - 9.6px) 100%,0 100%,0 9.6px)}',
-    '.np.sk-normandy .np-in::before{opacity:.45}',
-    '.np.sk-normandy .np-mini{grid-template-columns:38px minmax(0,1fr) auto;gap:10px;padding:9px 10px 11px}',
-    '.np.sk-normandy .np-art{width:38px;height:38px;box-shadow:none}',
-    '.np.sk-normandy .np-hero{border-radius:0;box-shadow:none}',
-    '.np.sk-normandy .np-t{font-weight:600;font-size:12.5px;letter-spacing:.03em}',
-    '.np.sk-normandy .np-a{font-size:11px}',
-    '.np.sk-normandy button{border-radius:0}.np.sk-normandy button:hover{background:color-mix(in srgb,var(--c-acc) 16%,transparent)}',
-    '.np.sk-normandy .np-btns button,.np.sk-normandy .np-tog,.np.sk-normandy .np-add{width:28px;height:28px}',
-    '.np.sk-normandy .np-btns button svg,.np.sk-normandy .np-tog svg,.np.sk-normandy .np-add svg{width:15px;height:15px}',
-    '.np.sk-normandy .np-bands button{letter-spacing:.1em;font-size:10px}',
-    '.np.sk-normandy .np-play{width:28px;height:28px;background:none;color:var(--c-acc)}.np.sk-normandy .np-play:hover{background:color-mix(in srgb,var(--c-acc) 16%,transparent)}',
-    '.np.sk-normandy.playing .np-play{box-shadow:none;filter:drop-shadow(0 0 5px color-mix(in srgb,var(--c-acc) 70%,transparent))}',
-    '.np.sk-normandy .np-play svg{width:15px;height:15px}',
-    '.np.sk-normandy .np-btns{opacity:0;transition:opacity .35s ease}',
-    '.np.sk-normandy:hover .np-btns,.np.sk-normandy:focus-within .np-btns,.np.sk-normandy.big .np-btns{opacity:1}',
-    '@media (hover:none){.np.sk-normandy .np-btns{opacity:1}}',
-    '.np.sk-normandy .np-line{left:0;right:0;bottom:0;height:1px;border-radius:0;background:color-mix(in srgb,var(--c-line) 70%,transparent)}',
-    '.np.sk-normandy .np-line i{border-radius:0}.np.sk-normandy .np-line i::after{width:4px;height:4px;right:-2px;margin-top:-2px}',
-    '.np.sk-normandy .np-bands button,.np.sk-normandy .np-chips button,.np.sk-normandy .np-add{border-radius:0}',
-    '.np.sk-normandy .np-seek,.np.sk-normandy .np-foot{font-size:11px}',
-    '.np.sk-normandy input[type=range]{-webkit-appearance:none;appearance:none;height:1px;background:color-mix(in srgb,var(--c-acc) 45%,transparent)}',
-    '.np.sk-normandy input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:8px;height:8px;border-radius:50%;background:var(--c-acc);box-shadow:0 0 6px var(--c-acc)}',
-    '.np.sk-normandy input[type=range]::-moz-range-thumb{width:8px;height:8px;border:0;border-radius:50%;background:var(--c-acc)}',
-    '.np.sk-normandy .np-tog.on::after{margin-top:22px}',
-    '.np.sk-normandy .np-foot a{color:var(--c-acc)}',
     '/* Explore: chips to tap, a row of actions, then songs and playlists */',
     '.np-chips.scroll{min-width:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}.np-chips.scroll::-webkit-scrollbar{display:none}.np-chips.scroll button{flex:none}',
     '.np .np-acts{display:flex;gap:6px;flex-wrap:wrap}',
@@ -213,10 +163,7 @@ window.NowPlaying = (function () {
     '.np-gform{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:0}',
     '.np .np-gform button,.np-dj .np-gform button{width:auto;height:auto;border-radius:var(--np-r2);padding:0 14px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--np-hi);background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--np-acc) 45%,transparent)}',
     '.np .np-gform button:hover,.np-dj .np-gform button:hover{color:#fff;background:color-mix(in srgb,var(--np-acc) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--np-acc) 75%,transparent)}',
-    '.np.sk-normandy .np-sel,.np.sk-normandy .np-gform button{border-radius:0}',
     '.np-lab{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--np-ink2);margin-bottom:-6px}',
-    '.np.sk-normandy .np-acts button,.np.sk-normandy .np-djgo{border-radius:0}',
-    '.np.sk-normandy.big{width:min(400px,calc(100vw - 32px))}.np.sk-normandy.big.wide{width:min(780px,calc(100vw - 56px))}',
     '/* the source tabs: Spotify or YouTube, in the same card */',
     '.np-src{display:flex;align-items:center;gap:4px;padding:8px 12px 0}.np-src[hidden]{display:none}.np-srctabs{display:flex;gap:14px}.np-srctabs[hidden]{display:none}',
     '.np .np-djbtn svg{fill:none;width:18px;height:18px}',
@@ -228,7 +175,6 @@ window.NowPlaying = (function () {
     '.np .np-src button{position:relative;width:auto;height:auto;border-radius:0;padding:3px 0 6px;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--np-ink2)}.np .np-src button:hover{background:none;color:#fff}',
     '.np .np-src button::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;background:var(--np-acc);box-shadow:0 0 8px var(--np-acc);transform:scaleX(0);transition:transform .3s ease}',
     '.np .np-src button[aria-selected=true]{color:#fff}.np .np-src button[aria-selected=true]::after{transform:none}',
-    '.np.sk-normandy .np-src button{border-radius:0}',
     '.np-yt{display:none}.np.src-yt .np-yt{display:block}.np.src-yt .np-sp{display:none}.np.src-yt{--np-acc:#ff4e45!important}',
     '.np.src-yt.np-idle{cursor:default}.np.src-yt.np-idle .np-yt .np-btns{display:flex}.np.src-yt.np-idle .np-yt .np-line{display:block}.np.src-yt.np-idle .np-yt .np-more{display:grid}.np.src-yt.np-idle .np-yt .np-art{opacity:1}',
     '.np.big .np-yt .np-line{display:none}',
@@ -242,7 +188,6 @@ window.NowPlaying = (function () {
     '.np-dj .dj-share{background:rgba(10,10,20,.5);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}.np-dj .dj-share svg{fill:none}.np-dj .dj-share[hidden]{display:none}',
     '.np .np-share svg{fill:none}.np-shares[hidden]{display:none}',
     '/* the desktop app: the player is the widget */',
-    '.np.in-app .np-here,.np.in-app .np-herenote{display:none}',
     '.np.in-app.np-idle{cursor:default}.np.in-app.np-idle .np-btns{display:flex}.np.in-app.big.np-idle .np-more{display:grid}',
     '/* YouTube in the full view: the player card is hidden except its video, which moves to where the cover goes */',
     '.np-dj.m-yt{z-index:19}.np-dj.m-yt .dj-cover{visibility:hidden;aspect-ratio:16/9;height:auto;width:min(58vw,720px,calc((100vh - 280px) * 16 / 9))}',
@@ -250,7 +195,7 @@ window.NowPlaying = (function () {
     '.np.yt-full .np-card,.np.yt-full .np-in{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;clip-path:none!important;overflow:visible}',
     '.np.yt-full .np-yt .np-more{opacity:1;overflow:visible}.np.yt-full .np-yt .np-pane[data-pane=now]{display:grid}',
     '.np.yt-full .yt-vid{visibility:visible;position:fixed!important;z-index:5;border-radius:22px;box-shadow:0 30px 80px rgba(0,0,0,.55)}',
-    '.np.dj-hide,.np-tab.dj-hide{opacity:0!important;pointer-events:none!important}',
+    '.np.dj-hide{opacity:0!important;pointer-events:none!important}',
     '/* DJ mode: the whole page, with the wallpaper still showing through */',
     '.np-dj{position:fixed;inset:0;z-index:30;display:grid;grid-template-rows:auto 1fr auto;gap:12px;padding:max(18px,env(safe-area-inset-top)) clamp(16px,4vw,48px) max(18px,env(safe-area-inset-bottom));color:#f5f3ff;font:500 14px/1.4 "Chakra Petch","Trebuchet MS",system-ui,sans-serif;--np-acc:#1ed760;--np-hi:color-mix(in srgb,var(--np-acc) 50%,#fff);background:linear-gradient(transparent 62%,rgba(4,4,12,.86)),radial-gradient(120% 90% at 50% 50%,rgba(4,4,12,.18),rgba(4,4,12,.62));opacity:0;pointer-events:none;transition:opacity .6s ease;overflow:hidden}',
     '.np-dj.on{opacity:1;pointer-events:auto}',
@@ -265,7 +210,7 @@ window.NowPlaying = (function () {
     '.dj-tag i{width:8px;height:8px;border-radius:50%;background:var(--np-acc);box-shadow:0 0 10px var(--np-acc)}.np-dj.playing .dj-tag i{animation:dj-pulse 1.6s ease-in-out infinite}',
     '@keyframes dj-pulse{50%{transform:scale(.55);opacity:.6}}',
     '.dj-vibe{flex:1;min-width:0;font-size:12px;color:rgba(245,243,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 8px rgba(0,0,0,.6)}',
-    '.np-dj .dj-x,.np-dj .dj-pip{background:rgba(10,10,20,.5);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}',
+    '.np-dj .dj-x{background:rgba(10,10,20,.5);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}',
     '.dj-mid{display:flex;align-items:center;justify-content:center;gap:clamp(20px,5vw,64px);min-height:0}',
     '.dj-cover{display:block;width:min(46vh,40vw,520px);aspect-ratio:1;object-fit:cover;border-radius:22px;background:rgba(255,255,255,.06);box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.08);flex:none;transition:transform .8s ease}',
     '.dj-cover:not([src]){visibility:hidden}',
@@ -303,7 +248,7 @@ window.NowPlaying = (function () {
     '.dj-upnext li{display:flex;align-items:center;gap:8px;min-width:0;max-width:220px}.dj-upnext img{width:28px;height:28px;border-radius:6px;object-fit:cover;flex:none;background:rgba(255,255,255,.08)}',
     '.dj-upnext li span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     '/* quiet after a few seconds without the mouse: the cover and the song stay, the buttons fade */',
-    '.np-dj.calm .dj-ctl,.np-dj.calm .dj-bot,.np-dj.calm .dj-x,.np-dj.calm .dj-pip{opacity:0}',
+    '.np-dj.calm .dj-ctl,.np-dj.calm .dj-bot,.np-dj.calm .dj-x{opacity:0}',
     '@media (max-width:760px),(max-aspect-ratio:1/1){.dj-mid{flex-direction:column;gap:18px;text-align:center}.dj-cover{width:min(62vw,40vh)}.dj-meta{justify-items:center}.dj-ctl{margin:0}.dj-prog{width:100%}}',
     '/* the playlist picker: a sheet to tap, no typing */',
     '.np-pick{position:fixed;inset:0;z-index:45;display:grid;place-items:center;padding:16px;background:rgba(4,4,12,.55);color:#f5f3ff;font:500 13px/1.4 "Chakra Petch","Trebuchet MS",system-ui,sans-serif;opacity:0;pointer-events:none;transition:opacity .25s ease}',
@@ -333,27 +278,10 @@ window.NowPlaying = (function () {
   }
 
   var HERE = (document.currentScript && document.currentScript.src) || location.href;
-  // the browser's small always-on-top window (Chrome, Edge) can only be opened by the top page: inside the rotation,
-  // which shows each wallpaper in a frame of the same site, it is opened through the rotation page
-  var PIPW = (function () {
-    try { if (window.top !== window && window.top.location.origin === location.origin && window.top.documentPictureInPicture) return window.top; } catch (e) { }
-    return window.top === window && 'documentPictureInPicture' in window ? window : null;
-  })();
   var SETUP = window.NP_SETUP_URL || new URL('spotify.html', HERE).href;   // the one sign-in page: the only address to register with Spotify
   function cid() { try { return localStorage.getItem('np-client') || ''; } catch (e) { return ''; } }
-  function corner() { try { return localStorage.getItem('np-corner') || 'tr'; } catch (e) { return 'tr'; } }
 
-  /* ---------- sign in (PKCE): out to Spotify, back to the sign-in page, then back to where you were ---------- */
-  // lively: a wallpaper address to make a Lively link for; that sign-in is Lively's own and is not kept in this browser
-  function connect(back, lively) {
-    var id = cid(); back = back || location.href;
-    if (!id) { location.href = SETUP + '?back=' + encodeURIComponent(back); return; }
-    var verifier = rand(64), state = rand(16);
-    crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)).then(function (h) {
-      try { localStorage.setItem('np-pkce', JSON.stringify({ v: verifier, s: state, back: back, lively: lively || null })); } catch (e) { }
-      location.href = AUTH + '/authorize?' + new URLSearchParams({ response_type: 'code', client_id: id, scope: SCOPES, redirect_uri: SETUP, code_challenge_method: 'S256', code_challenge: b64url(h), state: state });
-    });
-  }
+  /* ---------- the sign-in: made in the app (main.js and the set-up guide); kept fresh here ---------- */
   function tokenCall(body, keep) {
     return fetch(AUTH + '/api/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(body) })
       .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error_description || j.error || 'token'); return j; }); })
@@ -362,67 +290,12 @@ window.NowPlaying = (function () {
         if (keep !== false) save(t); return t;
       });
   }
-  // on the sign-in page, back from Spotify: swap the code for tokens. Resolves to the address to go back to, or for a
-  // Lively sign-in to { lively: link }: the wallpaper address carrying that sign-in, which this browser does not keep
-  function handleCallback() {
-    var q = new URLSearchParams(location.search), pk = null;
-    try { pk = JSON.parse(localStorage.getItem('np-pkce') || 'null'); localStorage.removeItem('np-pkce'); } catch (e) { }
-    if (q.get('error')) return Promise.reject(new Error('Spotify said: ' + q.get('error')));
-    if (!q.get('code')) return Promise.resolve(null);
-    if (!pk || q.get('state') !== pk.s) return Promise.reject(new Error('That sign-in did not start here; try again.'));
-    var body = { grant_type: 'authorization_code', code: q.get('code'), redirect_uri: SETUP, client_id: cid(), code_verifier: pk.v };
-    if (pk.lively) return tokenCall(body, false).then(function (t) { return { lively: String(pk.lively).split('#')[0] + '#sp=' + encodeURIComponent(t.refresh) + '~' + encodeURIComponent(cid()) }; });
-    return tokenCall(body).then(function () { return pk.back; });
-  }
   function signedIn() { var t = load(); return !!(t && t.refresh); }
   // signed in before the queue, library and speaker features: the sign-in lacks their permissions until done again
   function needsNewSignIn() { var t = load(); if (!t || !t.refresh || t.scope == null) return false; return SCOPES.split(' ').some(function (s) { return (' ' + t.scope + ' ').indexOf(' ' + s + ' ') < 0; }); }
   function disconnect() { save(null); }
-  // a link carrying the sign-in, for Lively's own browser: #sp=<refresh token>~<client id>
-  function livelyLink(url) {
-    var t = load(); if (!t || !t.refresh) return '';
-    var u = String(url).split('#')[0]; return u + '#sp=' + encodeURIComponent(t.refresh) + '~' + encodeURIComponent(cid());
-  }
-  (function () {   // any page opened with such a link keeps the sign-in
-    var m = /(?:^#|&)sp=([^&~]+)~?([^&]*)/.exec(location.hash);
-    if (!m) return;
-    // Lively opens the same link every time it starts the wallpaper. Spotify replaces the sign-in each time it renews it
-    // and the old one stops working, so the link's sign-in is taken only the first time; after that the renewed one is kept
-    var given = decodeURIComponent(m[1]), seen = null; try { seen = localStorage.getItem('np-sp-seen'); } catch (e) { }
-    if (given !== seen || !load()) { save({ refresh: given, access: null, exp: 0 }); try { localStorage.setItem('np-sp-seen', given); } catch (e) { } }
-    if (m[2]) try { localStorage.setItem('np-client', decodeURIComponent(m[2])); } catch (e) { }
-    history.replaceState(null, '', location.pathname + location.search);
-  })();
 
-  /* check(): asks Spotify what this browser's sign-in may do, without changing anything (for the Spotify page) */
-  function check() {
-    var t = load(); if (!t || !t.refresh) return Promise.resolve([['Signed in', false, 'Not signed in on this browser']]);
-    var got = (t.scope || '').split(' ').filter(Boolean), need = SCOPES.split(' '), missing = need.filter(function (x) { return got.indexOf(x) < 0; });
-    var out = [['Permissions', !missing.length, missing.length ? 'Missing: ' + missing.join(', ') + '. Press Sign in again.' : 'All granted']];
-    function tok() { t = load(); if (t.access && Date.now() < t.exp) return Promise.resolve(t.access); return tokenCall({ grant_type: 'refresh_token', refresh_token: t.refresh, client_id: cid() }).then(function (n) { return n.access; }); }
-    function get(path, method) {
-      return tok().then(function (a) { return fetch(API + path, { method: method || 'GET', headers: { Authorization: 'Bearer ' + a } }); }).then(function (r) {
-        return r.text().then(function (x) { var j = null; try { j = JSON.parse(x); } catch (e) { } return { ok: r.ok, status: r.status, j: j, msg: j && j.error ? (j.error.reason || j.error.message) : '' }; });
-      });
-    }
-    var TRACK = '4cOdK2wGLETKBW3PvgPWqT';   // any well-known song: only asks whether it is in your library
-    return get('/me').then(function (r) {
-      out.push(['Account', r.ok, r.ok ? (r.j.display_name || r.j.id) + (r.j.product ? ' · Spotify ' + r.j.product : '') : r.status + ' ' + r.msg]);
-      return get('/me/tracks/contains?ids=' + TRACK);
-    }).then(function (r) {
-      out.push(['Liked songs (/me/tracks)', r.ok, r.ok ? 'Works' : r.status + ' ' + r.msg]);
-      return get('/me/library/contains?uris=' + encodeURIComponent('spotify:track:' + TRACK));
-    }).then(function (r) {
-      out.push(['Liked songs (/me/library)', r.ok, r.ok ? 'Works' : r.status + ' ' + r.msg]);
-      return get('/me/playlists?limit=1');
-    }).then(function (r) {
-      out.push(['Your playlists', r.ok, r.ok ? 'Works' : r.status + ' ' + r.msg]);
-      return out;
-    }, function (e) { out.push(['Spotify', false, e.message]); return out; });
-  }
-
-  /* init({ id, interactive }): the player on a wallpaper. Its switch is kept per wallpaper (np-on-<id>), off until
-     turned on; ?spotify=1 or 0 in the address overrides it. */
+  /* init({ id, on, app }): the player, in the island */
   function init(opts) {
     opts = opts || {};
     var key = 'np-on-' + (opts.id || 'page'), enabled = false;
@@ -516,14 +389,14 @@ window.NowPlaying = (function () {
 
     /* ---------- the card ---------- */
     var st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
-    var npc = new URLSearchParams(location.search).get('npc'), box = document.createElement('div'), cor = /^(tr|tl|br|bl)$/.test(npc || '') ? npc : corner(); box.className = 'np ' + cor; box.setAttribute('role', 'region'); box.setAttribute('aria-label', 'Now playing on Spotify');
+    var box = document.createElement('div'); box.className = 'np tr'; box.setAttribute('role', 'region'); box.setAttribute('aria-label', 'Now playing on Spotify');
     var BANDS = [['now', 'Now'], ['queue', 'Queue'], ['search', 'Search'], ['lib', 'Library'], ['dev', 'Devices']];
     box.innerHTML = '<div class="np-card"><div class="np-in">' +
       '<div class="np-src" hidden><span class="np-srctabs" role="tablist" aria-label="Music from" hidden><button type="button" role="tab" data-s="sp" aria-selected="true">Spotify</button><button type="button" role="tab" data-s="yt" aria-selected="false">YouTube</button></span>' +
       '<button type="button" class="np-resign" title="Sign in again">' + ICON.key + 'Sign in</button></div>' +
       '<div class="np-sp"><div class="np-mini"><img class="np-art" alt=""><span class="np-lk" aria-hidden="true">' + ICON.heartOn + '</span><div class="np-txt"><b class="np-t"><span>—</span></b><span class="np-a"></span></div>' +
       '<div class="np-btns"><button type="button" class="np-prev" aria-label="Previous">' + ICON.prev + '</button><button type="button" class="np-play" aria-label="Pause">' + ICON.pause + '</button>' +
-      '<button type="button" class="np-next" aria-label="Next">' + ICON.next + '</button><button type="button" class="np-djbtn" aria-label="DJ mode" title="DJ mode: new songs in a vibe you pick, full page">' + ICON.dj + '</button><button type="button" class="np-pip" aria-label="Small window" title="Small window: a little player that stays on top">' + ICON.pip + '</button><button type="button" class="np-wide" aria-label="Expand" aria-pressed="false" title="Expand">' + ICON.wide + '</button><button type="button" class="np-exp" aria-label="More" aria-expanded="false">' + ICON.open + '</button></div>' +
+      '<button type="button" class="np-next" aria-label="Next">' + ICON.next + '</button><button type="button" class="np-djbtn" aria-label="DJ mode" title="DJ mode: new songs in a vibe you pick, full page">' + ICON.dj + '</button><button type="button" class="np-wide" aria-label="Expand" aria-pressed="false" title="Expand">' + ICON.wide + '</button><button type="button" class="np-exp" aria-label="More" aria-expanded="false">' + ICON.open + '</button></div>' +
       '<span class="np-line" aria-hidden="true"><i></i></span></div>' +
       '<div class="np-more"><div class="np-bands" role="tablist" aria-label="Player">' +
       BANDS.map(function (b, i) { return '<button type="button" role="tab" data-p="' + b[0] + '" aria-selected="' + (i ? 'false' : 'true') + '" tabindex="' + (i ? -1 : 0) + '">' + b[1] + '</button>'; }).join('') + '</div>' +
@@ -543,8 +416,7 @@ window.NowPlaying = (function () {
       '<section class="np-pane" data-pane="dev" role="tabpanel" aria-label="Devices"><ul class="np-list np-dl"></ul>' +
       '<div class="np-foot"><button type="button" class="np-devrefresh">Refresh devices</button><a class="np-link" href="https://open.spotify.com" target="_blank" rel="noopener">Open Spotify on this computer ↗</a></div>' +
       (opts.app ? '<p class="np-note">To play through this computer’s audio, open the Spotify desktop app or web player on the same account, refresh, and select it here.</p>' : '') +
-      '<label class="np-here"><input type="checkbox" class="np-herecb"><span><b>Play on this wallpaper</b><small>Makes this page a Spotify speaker you can pick from your phone. Premium only.</small></span></label>' +
-      '<label class="np-here"><input type="checkbox" class="np-keepcb"><span><b>Keep the music here</b><small>Every 5 seconds, if another device has the music, this wallpaper takes it back (playing or paused, as it was).</small></span></label><p class="np-herenote" aria-live="polite"></p></section>' +
+      '</section>' +
       '</div></div><div class="np-yt"></div></div></div>';
     document.body.appendChild(box);
     var spEl = box.querySelector('.np-sp');   // Spotify's part of the card (YouTube has its own, in the same layout)
@@ -561,50 +433,24 @@ window.NowPlaying = (function () {
       var b = $('.np-t'), d = b.firstChild.scrollWidth - b.clientWidth;
       if (d > 2 && !reduce && b.clientWidth) { b.style.setProperty('--mq', -(d + 16) + 'px'); b.style.setProperty('--mqd', Math.max(5, (d + 16) / 22 + 3).toFixed(1) + 's'); b.classList.add('mq'); }
     }
-    var SITE = true, idleMode = null;
-    // in Lively (?wallpaper, but not the website's own rotation): no keyboard, so signing in has to happen on the PC's browser
-    var LIVELY = /[?&]wallpaper\b/.test(location.search) && !/[?&]npsite=1\b/.test(location.search);   // the same everywhere, ?wallpaper (Lively) included: the arrow and the Connect / Nothing playing cards always show
-    // the corner arrow: the player starts tucked away (remembered per wallpaper; nptuck=0 starts it out)
-    var tab = document.createElement('button'); tab.type = 'button'; tab.className = 'np-tab ' + cor + (opts.skin ? ' sk-' + opts.skin : '');
-    if (SITE) tab.classList.add('site');
-    tab.innerHTML = '<svg viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    document.body.appendChild(tab); box.classList.add('tabbed');
-    var tk = 'np-tuck-' + (opts.id || 'page'), tucked = true, tq = new URLSearchParams(location.search).get('nptuck');
-    try { var tv = localStorage.getItem(tk); if (tv !== null) tucked = tv === '1'; } catch (e) { }
-    if (tq === '0' || tq === '1') tucked = tq === '1';
-    function setTuck(t, keep) {
-      tucked = t; box.classList.toggle('tucked', t); tab.classList.toggle('out', !t);
-      tab.setAttribute('aria-expanded', String(!t)); tab.setAttribute('aria-label', t ? 'Show the Spotify player' : 'Tuck the Spotify player away'); tab.title = tab.getAttribute('aria-label');
-      if (!t) requestAnimationFrame(fitTitle); else setBig(false);
-      if (keep) try { localStorage.setItem(tk, t ? '1' : '0'); } catch (e) { }
-    }
-    tab.addEventListener('click', function () { setTuck(!tucked, true); });
-    setTuck(tucked);
-    function show() { box.classList.add('on'); tab.classList.add('on'); }
-    function hide() { if (enabled && src === 'yt') { show(); return; } box.classList.remove('on'); tab.classList.remove('on'); setBig(false); }   // the YouTube tab stays up
-    // the quiet states, on the website only (a wallpaper tucks the player away instead)
+    var idleMode = null;
+    function show() { box.classList.add('on'); }
+    function hide() { if (enabled && src === 'yt') { show(); return; } box.classList.remove('on'); setBig(false); }   // the YouTube tab stays up
+    // the quiet states: signed out, or nothing playing
     var NOTE = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#2b2238"/><path d="M16 12v13.5a4 4 0 1 1-2-3.5V14l12-3v11.5a4 4 0 1 1-2-3.5V9.4z" fill="#c9b8e8"/></svg>');
     function setIdle(mode) {
       if (mode === idleMode) { if (mode) show(); return; }
       idleMode = mode; box.classList.toggle('np-idle', !!mode);
       if (!mode) { art = ''; return; }
-      if (!opts.app) setBig(false);
       art = NOTE; $('.np-art').src = NOTE;
       setTitle(mode === 'connect' ? 'Spotify' : 'Nothing playing');
-      $('.np-a').textContent = mode === 'connect' ? (LIVELY ? 'Connect from your PC\'s browser: click for how' : 'Connect to show what is playing') : 'Play something on Spotify';
+      $('.np-a').textContent = mode === 'connect' ? 'Connect to show what is playing' : 'Play something on Spotify';
       show();
     }
     box.addEventListener('click', function (e) {   // a quiet card: click to connect, or to open Spotify
       if (src === 'yt' || e.target.closest('.np-src,.np-more')) return;
-      if (here && here.activateElement) try { here.activateElement(); } catch (er) { }   // lets the wallpaper speaker play sound (browsers want a click first)
       if (!idleMode || e.target.closest('button')) return;
-      if (idleMode === 'connect' && LIVELY) {   // a wallpaper cannot be typed into: point to the Spotify page on the PC, and copy its address
-        var addr = SETUP.replace(/^https?:\/\//, '');
-        var told = function (ok) { flash((ok ? 'Address copied. ' : '') + 'On your PC, open ' + addr + ', press Sign in for Lively, and paste the new link into Lively', true); };
-        try { navigator.clipboard.writeText(SETUP).then(function () { told(true); }, function () { told(false); }); } catch (er) { told(false); }
-        return;
-      }
-      if (idleMode === 'connect') { var w = window.top || window; try { w.location.href = SETUP + '?back=' + encodeURIComponent(w.location.href); } catch (er) { location.href = SETUP + '?back=' + encodeURIComponent(location.href); } }   // the whole tab, even from inside the rotation
+      if (idleMode === 'connect') { if (window.desktop) window.desktop.openGuide('spotify'); else window.open(SETUP, '_blank'); }   // the set-up guide, in the browser
       else if (idleMode === 'nothing') window.open('https://open.spotify.com', '_blank', 'noopener');
     });
     function paint() {
@@ -628,7 +474,7 @@ window.NowPlaying = (function () {
       $('.np-link').href = it.external_urls ? it.external_urls.spotify : 'https://open.spotify.com';
       $('.np-dur').textContent = fmt(it.duration_ms);
       $('.np-note').textContent = note;
-      djPaint(); pipPaint(); emitTrack();
+      djPaint(); emitTrack();
     }
     var lastEmit = null;
     function emitTrack() {
@@ -646,19 +492,18 @@ window.NowPlaying = (function () {
     var tickAt = 0;
     function tick(now) {   // the position, moved on locally between polls: every frame in the full view, four times a second otherwise
       requestAnimationFrame(tick);
-      if ((document.hidden && !pipWin) || (!djOpen && now - tickAt < 250)) return;
+      if (document.hidden || (!djOpen && now - tickAt < 250)) return;
       tickAt = now;
       if (S && S.item) {
         var pos = Math.min(S.item.duration_ms, S.progress_ms + (S.is_playing ? Date.now() - at : 0)), f = pos / S.item.duration_ms, pc = (f * 100).toFixed(2) + '%';
         $('.np-line i').style.width = pc;
         if (document.activeElement !== $('.np-pos')) { $('.np-pos').value = Math.round(f * 1000); $('.np-cur').textContent = fmt(pos); }
         if (djOpen) { djQ('.dj-bar i').style.width = pc; djQ('.dj-cur').textContent = fmt(pos); }
-        if (pipWin) pipWin.document.querySelector('.bar i').style.width = pc;
       }
     }
     requestAnimationFrame(tick);
-    function tint(url) {   // the card takes a colour from the cover (if the image allows it); a skin keeps its own
-      if (!url || opts.skin) return;
+    function tint(url) {   // the card takes a colour from the cover (if the image allows it)
+      if (!url) return;
       var im = new Image(); im.crossOrigin = 'anonymous';
       im.onload = function () {
         try {
@@ -674,14 +519,14 @@ window.NowPlaying = (function () {
     /* ---------- polling ---------- */
     // Each page asks Spotify what is playing; the answer is shared through this browser's storage, so another page that
     // asked a moment ago (and after our last button press) saves this one a request: three open pages cost about one.
-    var pollWho = rand(8), lastAction = 0, polling = false, panelActive = false, lagged = false, lastRaw = null;
-    function shared() { try { var x = JSON.parse(localStorage.getItem('np-shared') || 'null'); return x && x.t ? x : null; } catch (e) { return null; } }
-    function hereActive() { return !!(hereId && S && S.device && S.device.id === hereId); }
+    var lastAction = 0, polling = false, panelActive = false, lagged = false, lastRaw = null;
+    // how long until Spotify is asked again: often while the player is open, rarely while it is closed, and always just after
+    // the song should end, so the next one shows straight away (a skip from another device shows within 10 s)
     function gap() {
       if (!tok) return 10000;
-      if (opts.app && !panelActive) return S && S.is_playing ? 15000 : 30000;
-      if (S && S.is_playing) return hereActive() ? 15000 : (box.classList.contains('big') || djOpen || keepHere ? 5000 : 8000);   // playing here: the speaker itself reports changes
-      return S && S.item ? 6000 : 12000;
+      var playing = S && S.is_playing, g = !panelActive ? (playing ? 10000 : 30000) : playing ? (box.classList.contains('big') || djOpen ? 5000 : 8000) : (S && S.item ? 6000 : 12000);
+      if (playing && S.item && S.item.duration_ms) { var left = S.item.duration_ms - S.progress_ms - (Date.now() - at); if (left > 0) g = Math.min(g, left + 700); }
+      return Math.max(1200, g);
     }
     function poll() {
       if (polling) return;
@@ -689,14 +534,12 @@ window.NowPlaying = (function () {
       tok = load() || tok;
       if (!enabled || !tok || document.hidden) {
         if (!enabled || !tok) hide();
-        if (enabled && !tok && SITE) setIdle('connect');   // on the website, signed out: a card to connect
+        if (enabled && !tok) setIdle('connect');   // signed out: a card to connect
         timer = setTimeout(poll, 4000); return;
       }
       polling = true;
-      var requestedAt = Date.now(), sh = shared(), ask = sh && sh.who !== pollWho && sh.t > lastAction && Date.now() - sh.t < 2500
-        ? Promise.resolve(sh.S)
-        : call('GET', '/me/player?additional_types=episode').then(function (j) { try { localStorage.setItem('np-shared', JSON.stringify({ t: Date.now(), who: pollWho, S: j })); } catch (e) { } return j; });
-      ask.then(function (j) {
+      var requestedAt = Date.now();
+      call('GET', '/me/player?additional_types=episode').then(function (j) {
         if (busy || requestedAt < lastAction || Date.now() < hold) return;   // a control was just pressed: let its result settle first
         var was = S && S.item && S.is_playing && j && j.item && j.is_playing && S.item.id === j.item.id ? S.progress_ms + (Date.now() - at) : null;
         var raw = j && j.item ? j.item.id + '@' + j.progress_ms : null, stale = raw && raw === lastRaw;
@@ -714,10 +557,9 @@ window.NowPlaying = (function () {
         if (j && j.device && j.device.id && (j.device.id === (selectedDevice && selectedDevice.id) || Date.now() >= deviceSettlesAt)) selectedDevice = null;
         if (j && j.item && j.is_playing) lastPlay = Date.now();
         setStatus(j && j.item ? (j.is_playing ? 'playing' : 'paused') : 'idle');
-        djPaint(); djKeepGoing(); if (keepHere) grabCheck();
-        if (j && j.item && (j.is_playing || SITE || Date.now() - lastPlay < 30000)) { setIdle(null); paint(); show(); }   // on the website a paused track stays, ready to resume
-        else if (SITE) { setIdle('nothing'); S = null; emitTrack(); }   // on the website, nothing playing: a quiet card
-        else hide();   // as a wallpaper, paused for 30 s or stopped: tuck away
+        djPaint(); djKeepGoing();
+        if (j && j.item) { setIdle(null); paint(); show(); }   // a paused track stays, ready to resume
+        else { setIdle('nothing'); S = null; emitTrack(); }   // nothing playing: a quiet card
       }).catch(function (e) {
         if (/signed out|invalid_grant|refresh token/i.test(e.message)) { tok = null; save(null); hide(); setStatus('off', 'Signed out. Connect again.'); return; }
         setStatus('error', why(e));
@@ -794,7 +636,7 @@ window.NowPlaying = (function () {
         setBig: function (b) { setBig(b); }, isBig: function () { return box.classList.contains('big'); },
         toggleWide: function () { setWide(!box.classList.contains('wide'), true); }, isWide: function () { return box.classList.contains('wide'); },
         pauseOther: function () { if (S && S.is_playing) ctl('PUT', '/me/player/pause', function () { S.progress_ms += Date.now() - at; at = Date.now(); S.is_playing = false; }); },   // YouTube started: Spotify pauses
-        canPip: !!PIPW, pipHost: PIPW,
+        canPip: false, pipHost: null,
         openFull: function () { setView('yt'); }, closeFull: function () { if (view === 'yt') setView(null, true); }, onChange: function () { if (view === 'yt') djPaint(); }
       });
       box.querySelector('.np-srctabs').hidden = false;
@@ -852,7 +694,7 @@ window.NowPlaying = (function () {
     function likePaint() {
       var b = $('.np-like'); b.innerHTML = liked ? ICON.heartOn : ICON.heart; b.classList.toggle('on', !!liked); b.setAttribute('aria-pressed', String(!!liked));
       box.classList.toggle('is-liked', !!liked && !!(S && S.item)); if (S && S.item && S.item.id && liked != null) { likes[S.item.id] = !!liked; syncHearts(S.item.id); }
-      if (djOpen) djPaint(); pipPaint();
+      if (djOpen) djPaint();
     }
     $('.np-like').addEventListener('click', function () {
       if (!S || !S.item || !S.item.id) return;
@@ -871,7 +713,7 @@ window.NowPlaying = (function () {
         if (chosen) { selectedDevice = null; throw new Error(chosen.name + ' is unavailable. Choose a device again.'); }
         return call('GET', '/me/player/devices').then(function (j) {
           var ds = (j && j.devices || []).filter(function (d) { return d.id && !d.is_restricted; });
-          var d = ds.find(function (x) { return x.is_active || x.id === hereId; }) || (ds.length === 1 ? ds[0] : null);
+          var d = ds.find(function (x) { return x.is_active; }) || (ds.length === 1 ? ds[0] : null);
           if (!d || (target && d.id === target.id)) throw new Error('Choose an available Spotify player in Devices, then try again.');
           return startOn(d);
         });
@@ -1286,7 +1128,7 @@ window.NowPlaying = (function () {
     /* ---------- DJ mode: covers the page, the wallpaper showing through; it keeps adding new songs so the music carries on ---------- */
     var djEl = el('div', 'np-dj'); djEl.setAttribute('role', 'region'); djEl.setAttribute('aria-label', 'DJ mode'); djEl.setAttribute('aria-hidden', 'true');
     djEl.innerHTML = '<img class="dj-glow" alt="">' +
-      '<div class="dj-top"><span class="dj-tag"><i></i><em>Worlds DJ</em></span><span class="dj-vibe"></span><button type="button" class="dj-go" title="DJ mode: new songs in a vibe you pick">' + ICON.dj + 'DJ</button><button type="button" class="dj-share" hidden title="Share this song to Discord">' + ICON.share + '</button><button type="button" class="dj-pip" aria-label="Small window" title="Small window: a little player that stays on top">' + ICON.pip + '</button><button type="button" class="dj-x" aria-label="Leave DJ mode" title="Leave DJ mode">' + ICON.x + '</button></div>' +
+      '<div class="dj-top"><span class="dj-tag"><i></i><em>Worlds DJ</em></span><span class="dj-vibe"></span><button type="button" class="dj-go" title="DJ mode: new songs in a vibe you pick">' + ICON.dj + 'DJ</button><button type="button" class="dj-share" hidden title="Share this song to Discord">' + ICON.share + '</button><button type="button" class="dj-x" aria-label="Leave DJ mode" title="Leave DJ mode">' + ICON.x + '</button></div>' +
       '<div class="dj-mid"><div class="dj-card" title="Play / pause"><img class="dj-cover" alt=""><span class="dj-glare" aria-hidden="true"></span></div><div class="dj-meta"><span class="dj-line"></span><b class="dj-t"></b><span class="dj-a"></span>' +
       '<div class="dj-prog"><span class="dj-cur">0:00</span><span class="dj-bar"><i></i></span><span class="dj-dur">0:00</span></div>' +
       '<div class="dj-ctl"><button type="button" class="dj-like" aria-label="Save to your library" aria-pressed="false">' + ICON.heart + '</button><button type="button" class="dj-prev" aria-label="Previous">' + ICON.prev + '</button>' +
@@ -1425,7 +1267,7 @@ window.NowPlaying = (function () {
       close.title = minimize ? 'Back to tablet' : v === 'dj' ? 'Exit DJ mode' : 'Exit full screen';
       close.setAttribute('aria-label', close.title);
       var hideCard = v === 'dj' || v === 'now';
-      box.classList.toggle('dj-hide', hideCard); tab.classList.toggle('dj-hide', !!v);
+      box.classList.toggle('dj-hide', hideCard);
       box.classList.toggle('yt-full', v === 'yt');
       window.dispatchEvent(new CustomEvent('np:view', { detail: { view: v, returnExpanded: returnExpanded } }));
       if (v) { setBig(false); djLastId = null; djArt = ''; nextFor = null; if (v === 'dj') djChips(); else djQ('.dj-vibe').textContent = v === 'now' && nowFrom ? nowFrom : ''; if (v !== 'yt') checkLiked(); djPaint(); wake(); }
@@ -1479,60 +1321,6 @@ window.NowPlaying = (function () {
     ['pointermove', 'pointerdown', 'keydown'].forEach(function (ev) { djEl.addEventListener(ev, wake); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { if (pk.classList.contains('on')) pkClose(); else if (djOpen) djLeave(); } });
 
-    /* ---------- a small window: the browser's own picture-in-picture window, which stays on top of everything (Chrome, Edge) ---------- */
-    var pipWin = null, CAN_PIP = !!PIPW && !opts.app;   // wherever the browser can (also on ?wallpaper pages opened in a browser)
-    window.addEventListener('pagehide', function () { if (pipWin) try { pipWin.close(); } catch (e) { } });   // the rotation moved on: its small window goes with it
-    var CAN_MINI = !CAN_PIP && !opts.mini && !opts.app;   // Firefox, Safari: a small popup window instead (Spotify only)
-    if (CAN_PIP) { box.classList.add('can-pip'); djEl.classList.add('can-pip'); }
-    else if (CAN_MINI) { box.classList.add('can-mini'); djEl.classList.add('can-mini'); }
-    var PIPCSS = 'html,body{margin:0;height:100%;background:#07070d;color:#f5f3ff;font:500 13px/1.35 "Chakra Petch","Trebuchet MS",system-ui,sans-serif;overflow:hidden}' +
-      '.pp{position:relative;height:100%;display:grid;grid-template-rows:minmax(0,1fr) auto auto auto;gap:10px;padding:14px;box-sizing:border-box;--acc:#1ed760}' +
-      '.bg{position:absolute;inset:-20%;width:140%;height:140%;object-fit:cover;filter:blur(40px) saturate(1.4);opacity:.5;pointer-events:none}.bg:not([src]){display:none}' +
-      '.pp>*:not(.bg){position:relative}' +
-      '.cv{width:100%;height:100%;min-height:0;object-fit:contain;border-radius:14px;filter:drop-shadow(0 12px 28px rgba(0,0,0,.5))}.cv:not([src]){visibility:hidden}' +
-      '.tx{display:grid;min-width:0;text-align:center}.tx b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tx span{color:rgba(245,243,255,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-      '.bar{height:3px;border-radius:3px;background:rgba(255,255,255,.18);overflow:hidden}.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,transparent,var(--acc));box-shadow:0 0 8px var(--acc)}' +
-      '.ct{display:flex;justify-content:center;align-items:center;gap:6px}' +
-      'button{font:inherit;color:inherit;background:none;border:0;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;cursor:pointer}button:hover{background:rgba(255,255,255,.14)}button:focus-visible{outline:2px solid var(--acc)}' +
-      'button svg{width:19px;height:19px;fill:currentColor}.play{width:48px;height:48px;background:#f5f3ff;color:#111}.play:hover{background:#fff}.like.on{color:var(--acc)}' +
-      '@media (max-height:190px){.cv{display:none}.pp{grid-template-rows:1fr auto auto auto}}';
-    function pipPaint() {
-      if (!pipWin) return; var d = pipWin.document, it = S && S.item;
-      var img = it ? (it.album && it.album.images && it.album.images[0] ? it.album.images[0].url : (it.images && it.images[0] ? it.images[0].url : '')) : '';
-      ['.cv', '.bg'].forEach(function (c) { var im = d.querySelector(c); if (img) { if (im.getAttribute('src') !== img) im.src = img; } else im.removeAttribute('src'); });
-      d.querySelector('.tx b').textContent = it ? it.name : 'Nothing playing';
-      d.querySelector('.tx span').textContent = it ? (it.artists || it.show && [it.show] || []).map(function (a) { return a.name; }).join(', ') : 'Play something on Spotify';
-      var p = d.querySelector('.play'); p.innerHTML = S && S.is_playing ? ICON.pause : ICON.play; p.setAttribute('aria-label', S && S.is_playing ? 'Pause' : 'Play');
-      var lk = d.querySelector('.like'); lk.innerHTML = liked ? ICON.heartOn : ICON.heart; lk.classList.toggle('on', !!liked);
-      var acc = box.style.getPropertyValue('--np-acc'); if (acc) d.querySelector('.pp').style.setProperty('--acc', acc);
-      d.title = it ? it.name + ' · Worlds' : 'Worlds player';
-    }
-    function openPip() {
-      if (!CAN_PIP) {
-        if (CAN_MINI) window.open(new URL('mini.html', HERE).href, 'worlds-mini', 'popup=yes,width=360,height=480');
-        return;
-      }
-      if (pipWin) { pipWin.close(); return; }
-      PIPW.documentPictureInPicture.requestWindow({ width: 320, height: 400 }).then(function (w) {
-        pipWin = w; var d = w.document;
-        Array.prototype.forEach.call(document.querySelectorAll('link[rel=stylesheet][href*="fonts.googleapis"]'), function (l) { d.head.appendChild(l.cloneNode()); });
-        var st2 = d.createElement('style'); st2.textContent = PIPCSS; d.head.appendChild(st2);
-        d.body.innerHTML = '<div class="pp"><img class="bg" alt=""><img class="cv" alt=""><div class="tx"><b></b><span></span></div><div class="bar"><i></i></div>' +
-          '<div class="ct"><button type="button" class="like" aria-label="Save to your library">' + ICON.heart + '</button><button type="button" class="prev" aria-label="Previous">' + ICON.prev + '</button>' +
-          '<button type="button" class="play" aria-label="Play">' + ICON.play + '</button><button type="button" class="next" aria-label="Next">' + ICON.next + '</button>' +
-          '<button type="button" class="back" aria-label="Back to the page" title="Back to the page">' + ICON.pip + '</button></div></div>';
-        d.querySelector('.play').addEventListener('click', function () { if (S && S.item) $('.np-play').click(); else if (dj.on) djStart(); setTimeout(pipPaint, 30); });
-        d.querySelector('.next').addEventListener('click', function () { $('.np-next').click(); });
-        d.querySelector('.prev').addEventListener('click', function () { $('.np-prev').click(); });
-        d.querySelector('.like').addEventListener('click', function () { $('.np-like').click(); setTimeout(pipPaint, 30); });
-        d.querySelector('.back').addEventListener('click', function () { w.close(); });
-        w.addEventListener('pagehide', function () { pipWin = null; });
-        pipPaint();
-      }, function (e) { flash('The small window could not open: ' + e.message); });
-    }
-    $('.np-pip').addEventListener('click', openPip);
-    djQ('.dj-pip').addEventListener('click', function () { if (view === 'yt') yt.pip(); else openPip(); });
-    if (dj.on && enabled && !opts.app) setDj(true);   // keep the desktop pill compact when reopening the app
 
     // Library: playlists, recently played, top songs and top artists (4 weeks, 6 months, all time)
     var lib = 'pl', range = 'short_term';
@@ -1575,17 +1363,16 @@ window.NowPlaying = (function () {
     }
 
     // Devices: everything on your account that can play; press one to move the music there
-    var DEVNAME = 'Worlds wallpaper';
     function fillDev() {
       var ok = fresh('dev'), ul = $('.np-dl');
       if (!ul.firstChild) list(ul, [{ empty: 'Looking for devices…' }]);
       call('GET', '/me/player/devices').then(function (j) {
         if (!ok()) return; var ds = j && j.devices || [];
         list(ul, ds.length ? ds.map(function (d) {
-          var mine = d.id && d.id === hereId, available = d.id && !d.is_restricted;
+          var available = d.id && !d.is_restricted;
           var selected = selectedDevice && d.id === selectedDevice.id;
           var state = d.is_active ? 'Active' : selected ? 'Selected for the next track' : available ? 'Play here' : 'Spotify controls unavailable';
-          return { t: d.name + (mine ? ' (this one)' : ''), s: [d.type, state, d.volume_percent != null ? 'vol ' + d.volume_percent + '%' : ''].filter(Boolean).join(' · '),
+          return { t: d.name, s: [d.type, state, d.volume_percent != null ? 'vol ' + d.volume_percent + '%' : ''].filter(Boolean).join(' · '),
             icon: DEV[d.type] || DEV.Speaker, on: d.is_active || selected, verb: 'Play on', go: d.is_active || !available ? null : function () { transfer(d); } };
         }) : [{ empty: 'No Spotify devices available. Open Spotify on the device you want to use, then refresh.' }]);
       }, function (e) { if (ok()) failed(ul, e); });
@@ -1603,78 +1390,6 @@ window.NowPlaying = (function () {
       }).finally(function () { busy = false; });
     }
 
-    // the wallpaper as a speaker: Spotify's own in-browser player makes this page a device (Premium; the browser must allow protected audio)
-    var here = null, hereId = null, sdk = null, hk = 'np-here-' + (opts.id || 'page'), hereOn = false;
-    function hereNote(t) { $('.np-herenote').textContent = t; }
-    function loadSdk() {
-      if (sdk) return sdk;
-      sdk = new Promise(function (res, rej) {
-        if (window.Spotify && window.Spotify.Player) { res(); return; }
-        var prev = window.onSpotifyWebPlaybackSDKReady;
-        window.onSpotifyWebPlaybackSDKReady = function () { if (prev) try { prev(); } catch (e) { } res(); };
-        var s = document.createElement('script'); s.src = 'https://sdk.scdn.co/spotify-player.js'; s.async = true;
-        s.onerror = function () { sdk = null; rej(new Error('Could not reach Spotify\'s player')); };
-        document.head.appendChild(s);
-      });
-      return sdk;
-    }
-    function setHere(on, keep) {
-      hereOn = on; $('.np-herecb').checked = on;
-      if (keep) try { localStorage.setItem(hk, on ? '1' : '0'); } catch (e) { }
-      if (!on) { if (here) try { here.disconnect(); } catch (e) { } here = null; hereId = null; hereNote(''); if (pane === 'dev') fillDev(); return; }
-      if (here) return;
-      hereNote('Switching on…');
-      loadSdk().then(function () {
-        if (!hereOn || here) return;
-        here = new window.Spotify.Player({ name: DEVNAME, volume: 0.7, getOAuthToken: function (cb) { access().then(cb, function () { cb(''); }); } });
-        here.addListener('ready', function (d) { hereId = d.device_id; hereNote(keepHere ? 'Ready: the music comes here.' : 'Ready: pick “' + DEVNAME + '” in Spotify, or press it above.'); if (pane === 'dev') fillDev(); setTimeout(grabCheck, 800); });
-        here.addListener('not_ready', function () { hereId = null; hereNote('Lost the connection: trying again…'); });
-        function stop(msg) { return function () { hereNote(msg); hereId = null; if (here) try { here.disconnect(); } catch (e) { } here = null; }; }
-        here.addListener('initialization_error', stop('This browser cannot play Spotify here (Lively\'s browser may not allow it).'));
-        here.addListener('authentication_error', stop('Sign in again on the Spotify page to allow this.'));
-        here.addListener('account_error', stop('Playing here needs Spotify Premium.'));
-        here.addListener('playback_error', function () { hereNote('Spotify could not play that here.'); });
-        here.addListener('player_state_changed', function (ps) {   // the speaker's own news: no request needed
-          if (!ps) { setTimeout(poll, 500); return; }   // the music moved to another device
-          var ct = ps.track_window && ps.track_window.current_track; if (!ct || Date.now() < hold) return;
-          S = Object.assign({}, S || {}, { item: { id: ct.id, uri: ct.uri, name: ct.name, type: ct.type || 'track', duration_ms: ps.duration, artists: ct.artists || [], album: ct.album || {}, external_urls: { spotify: 'https://open.spotify.com/track/' + ct.id } },
-            is_playing: !ps.paused, progress_ms: ps.position, shuffle_state: ps.shuffle, repeat_state: ['off', 'context', 'track'][ps.repeat_mode] || 'off', device: Object.assign({}, S && S.device, { id: hereId, name: DEVNAME }) });
-          at = Date.now(); if (!ps.paused) lastPlay = at; setIdle(null); paint(); show(); djPaint();
-        });
-        here.connect();
-      }, function (e) { hereNote(e.message); });
-    }
-    $('.np-herecb').addEventListener('change', function () { setHere(this.checked, true); });
-    try { if (localStorage.getItem(hk) === '1' && enabled) setHere(true); } catch (e) { }
-    // keep the music here: every 5 seconds, if another device has it, the wallpaper takes it back (play or pause kept as it was).
-    // Only one page at a time does this (the rotation briefly has two wallpapers open while it crossfades).
-    var keepHere = false, lastGrab = 0, keepWho = rand(8);
-    try { keepHere = localStorage.getItem('np-keep-here') === '1'; } catch (e) { }
-    $('.np-keepcb').checked = keepHere;
-    $('.np-keepcb').addEventListener('change', function () {
-      keepHere = this.checked; try { localStorage.setItem('np-keep-here', keepHere ? '1' : '0'); } catch (e) { }
-      if (keepHere && !hereOn) setHere(true, true);
-      lastGrab = 0; grabCheck();
-    });
-    if (keepHere && enabled && !hereOn) setHere(true);
-    function keepLock() {
-      var l = null; try { l = JSON.parse(localStorage.getItem('np-keep-lock') || 'null'); } catch (e) { }
-      if (l && l.who !== keepWho && Date.now() - l.t < 12000) return false;
-      try { localStorage.setItem('np-keep-lock', JSON.stringify({ who: keepWho, t: Date.now() })); } catch (e) { } return true;
-    }
-    var grabMiss = 0;
-    function grabCheck() {
-      if (!keepHere || !hereId || !enabled || document.hidden || !keepLock()) return;
-      if (S && S.device && S.device.id === hereId) { grabMiss = 0; return; }   // already here
-      var wait = Math.min(60000, 5000 * Math.pow(2, grabMiss));   // 5 s, then 10, 20, 40, 60 while a move keeps not sticking
-      if (Date.now() - lastGrab < wait - 500) return;
-      if (lastGrab && Date.now() - lastGrab < 90000) grabMiss++; else grabMiss = 0;
-      lastGrab = Date.now(); lastAction = Date.now();
-      var playing = !!(S && S.is_playing);
-      call('PUT', '/me/player', { device_ids: [hereId], play: playing }).then(function () {
-        hereNote('Took the music back to this wallpaper.'); setTimeout(poll, 600);
-      }, function (e) { hereNote(why(e)); });
-    }
 
     if (opts.app) { opts.mini = true; box.classList.add('in-app'); }
     if (window.desktop && window.desktop.discord) {   // the app: share the song to a Discord channel
@@ -1685,9 +1400,7 @@ window.NowPlaying = (function () {
       };
       $('.np-share').addEventListener('click', share); djQ('.dj-share').addEventListener('click', share);
     }
-    if (opts.mini) { box.classList.add('mini-page'); tab.classList.add('mini-page'); setTuck(false); setTimeout(function () { setBig(true); }, 0); }
-    if (opts.interactive === false) box.classList.add('ro');
-    if (opts.skin) box.classList.add('sk-' + opts.skin);
+    if (opts.mini) { box.classList.add('mini-page'); setTimeout(function () { setBig(true); }, 0); }
     window.addEventListener('resize', function () { $('.np-t').classList.remove('mq'); fitTitle(); });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { $('.np-t').classList.remove('mq'); fitTitle(); });
 
@@ -1695,7 +1408,7 @@ window.NowPlaying = (function () {
     var volT = 0;
     return {
       enabled: function () { return enabled; },
-      setEnabled: function (on) { enabled = on; try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) { } if (!on) { hide(); setHere(false); } poll(); },
+      setEnabled: function (on) { enabled = on; try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) { } if (!on) hide(); poll(); },
       onStatus: function (fn) { statusFns.push(fn); fn(status, note); },
       // for the island: which source, open or closed, the full view, the buttons, what plays
       setSource: function (s2) { if (s2 === 'sp' || (s2 === 'yt' && yt)) setSrc(s2, true); },
@@ -1748,17 +1461,6 @@ window.NowPlaying = (function () {
     };
   }
 
-  /* attach(id, row, on, skin): the settings row (on: switched on by default; skin: a look of its own, e.g. 'normandy') on a wallpaper: a switch, and a link to sign in when not signed in yet */
-  function attach(id, row, on, skin) {
-    var p = init({ id: id, on: on, skin: skin });
-    var cb = row.querySelector('input[type=checkbox]'), link = row.querySelector('a');
-    cb.checked = p.enabled();
-    cb.addEventListener('change', function () { p.setEnabled(cb.checked); });
-    function upd() { if (link) { var again = needsNewSignIn(); link.hidden = signedIn() && !again; link.textContent = again ? 'Sign in again ↗' : 'Sign in ↗'; link.href = SETUP + '?back=' + encodeURIComponent(location.href); } }
-    p.onStatus(upd);
-    return p;
-  }
-  return { init: init, attach: attach, check: check, connect: connect, disconnect: disconnect, signedIn: signedIn, needsNewSignIn: needsNewSignIn, handleCallback: handleCallback, livelyLink: livelyLink, setup: SETUP,
-    clientId: cid, setClientId: function (v) { try { localStorage.setItem('np-client', v); } catch (e) { } },
-    corner: corner, setCorner: function (v) { try { localStorage.setItem('np-corner', v); } catch (e) { } } };
+  return { init: init, disconnect: disconnect, signedIn: signedIn, needsNewSignIn: needsNewSignIn, setup: SETUP,
+    clientId: cid, setClientId: function (v) { try { localStorage.setItem('np-client', v); } catch (e) { } } };
 })();

@@ -123,3 +123,14 @@ test('Server: download is limited to the configured Windows installer', async ()
     assert.equal((await fetch(url, { method: 'POST' })).status, 405);
   } finally { srv.close(); }
 });
+
+test('the Mac menu bar icon: a black star on clear, smooth at its edges (macOS draws it white on a dark menu bar)', () => {
+  const { starBitmap } = require('../lib/trayicon');
+  const b = starBitmap(36), a = (x, y) => b[(y * 36 + x) * 4 + 3];
+  assert.equal(b.length, 36 * 36 * 4);
+  assert.equal(a(18, 18), 255);                     // the middle: solid
+  assert.equal(a(0, 0), 0); assert.equal(a(35, 35), 0);   // the corners: clear
+  assert.equal(b[(18 * 36 + 18) * 4], 0);           // black (a template image is only its shape)
+  let soft = 0; for (let i = 3; i < b.length; i += 4) if (b[i] > 0 && b[i] < 255) soft++;
+  assert.ok(soft > 20);                             // smoothed edges
+});
