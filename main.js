@@ -127,9 +127,21 @@ function registerShortcut() {
 /* ---------- moving the island: dragged by its grip ---------- */
 let drag = null;
 function stopDrag() { if (drag) { clearInterval(drag.timer); drag = null; } }
-function dragIsland(phase) {
+const DRAG_PAD = 28;   // room around the island while it is carried (its shadow and glow)
+function dragIsland(phase, box) {
   if (phase === 'start' && !full && !drag) {
-    const c = screen.getCursorScreenPoint(), b = island.getBounds();
+    const c = screen.getCursorScreenPoint();
+    let b = island.getBounds();
+    /* the overlay is a big window: carrying all of it is slow (and macOS stops a tall window at the top of the screen),
+       so for the drag the window shrinks to the island itself, and goes back to the overlay when it is let go */
+    const ok = (v) => Number.isFinite(v) && v >= -4000 && v <= 8000;
+    if (OVERLAY && box && ok(box.x) && ok(box.y) && ok(box.w) && ok(box.h) && box.w > 0 && box.h > 0) {
+      const nb = { x: Math.round(b.x + box.x - DRAG_PAD), y: Math.round(b.y + box.y - DRAG_PAD),
+        width: Math.round(Math.min(b.width, box.w) + DRAG_PAD * 2), height: Math.round(Math.min(b.height, box.h) + DRAG_PAD * 2) };
+      lastPlace = '';   // the overlay's place is sent again on the drop
+      island.webContents.send('island-place', { drag: true, x: DRAG_PAD, y: DRAG_PAD });
+      island.setBounds(nb); b = nb;
+    }
     // the window follows the mouse, keeping its size: moved between screens of different scaling, Windows would
     // otherwise resize it on the way (and the island would jump away from the mouse)
     setClickThrough(false);
@@ -232,7 +244,7 @@ function wire() {
       islandSize = { width: Math.max(120, Math.round(a)), height: Math.max(40, Math.round(b)) };
       placeIsland();
     }
-    else if (what === 'drag') dragIsland(a);
+    else if (what === 'drag') dragIsland(a, b);
     else if (what === 'state') islandLevel = Number(a) || 0;
     else if (what === 'focus') island.focus();
     else if (what === 'blur') island.blur();

@@ -57,7 +57,7 @@ test('snapping: near the middle, the top or the bottom it lines up exactly', () 
 test('the overlay window: one size, placed so the pill sits on its anchor; the page learns where', () => {
   const top = P.overlayBounds(screens, A, null, 940, 900);
   assert.deepEqual([top.x, top.y, top.width, top.height], [250, 0, 940, 860]);   // no taller than the work area
-  assert.deepEqual(top.place, { up: false, cx: 470, top: 6, bottom: 860 - 42, left: -250, right: 1190 });
+  assert.deepEqual(top.place, { up: false, height: 860, cx: 470, top: 6, bottom: 860 - 42, left: -250, right: 1190 });
   const low = P.anchorFromWindow(screens, { x: 400, y: 800, width: 216, height: 66 }, false, 'spot');
   const b = P.overlayBounds(screens, A, low, 940, 900);
   assert.equal(b.up, true); assert.equal(b.place.up, true);

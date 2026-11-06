@@ -18,7 +18,9 @@ contextBridge.exposeInMainWorld('desktop', {
   island: {
     size: (w, h) => ipcRenderer.send('island', 'size', Number(w), Number(h)),
     ignore: (on) => ipcRenderer.send('island', 'ignore', !!on),   // the overlay: let clicks through to the desktop (the mouse is off the island)
-    drag: (phase) => ipcRenderer.send('island', 'drag', phase === 'start' ? 'start' : 'end'),   // the window follows the mouse until 'end'
+    // the window follows the mouse until 'end'; box: where the island is in the window (the overlay carries only that part)
+    drag: (phase, box) => ipcRenderer.send('island', 'drag', phase === 'start' ? 'start' : 'end', box && typeof box === 'object'
+      ? { x: Number(box.x), y: Number(box.y), w: Number(box.w), h: Number(box.h) } : null),
     state: (level) => ipcRenderer.send('island', 'state', Number(level) || 0),   // how open it is (Follow the mouse moves only the closed pill)
     full: (on2) => ipcRenderer.invoke('island-full', !!on2),
     focus: () => ipcRenderer.send('island', 'focus'),

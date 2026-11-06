@@ -557,17 +557,19 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     return [window.innerWidth, window.innerHeight, 0];
   }
   var ov = null;   // the overlay: where main.js put the pill in the window (and the screen's sides); null: the window follows the island's size
+  // the overlay window's height (main.js says, as the page may hear it before the window has its size again)
+  function winH() { return ov && ov.height > 0 ? ov.height : innerHeight; }
   function placeVars(w, h) {
     var st = document.documentElement.style;
     var left = Math.round(Math.max(ov.left + 6, Math.min(ov.right - w - 6, ov.cx - w / 2)));   // whole on its screen, near a side too
-    var top = ov.up ? Math.round(innerHeight - ov.bottom - h) : ov.top;                         // grows away from the edge it sits on
+    var top = ov.up ? Math.round(winH() - ov.bottom - h) : ov.top;                         // grows away from the edge it sits on
     st.setProperty('--ix', left + 'px'); st.setProperty('--iy', top + 'px');
   }
   function size() {
     if (level === 3) return;
     var t = target(), s = document.documentElement.style;
     if (ov) {   // no taller than the room it has in the window, no wider than its screen
-      t[1] = Math.min(t[1], (ov.up ? innerHeight - ov.bottom : innerHeight - ov.top) - 10);
+      t[1] = Math.min(t[1], (ov.up ? winH() - ov.bottom : winH() - ov.top) - 10);
       t[0] = Math.min(t[0], ov.right - ov.left - 12);
     }
     s.setProperty('--w', t[0] + 'px'); s.setProperty('--h', t[1] + 'px'); s.setProperty('--r', t[2] + 'px');
@@ -575,7 +577,8 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     // grows or shrinks around them nothing re-wraps; the shape simply reveals them
     s.setProperty(level === 0 ? '--pw' : '--cw', t[0] + 'px');
     clearTimeout(shrinkT);
-    if (ov) placeVars(t[0], t[1]);
+    if (ov && ov.drag) { /* being carried: main.js put it at the top left of a window its size */ }
+    else if (ov) placeVars(t[0], t[1]);
     else if (D) {
       var ww = t[0] + 44, wh = t[1] + 30;
       if (ww >= curW && wh >= curH) { D.island.size(ww, wh); curW = ww; curH = wh; }
@@ -682,7 +685,9 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     g.addEventListener('pointerdown', function (e) {
       if (e.button !== 0 || !D || !D.island.drag) return;
       e.preventDefault(); e.stopPropagation(); g.setPointerCapture(e.pointerId);
-      moving = true; body.classList.add('moving'); clearTimeout(hoverT); clearTimeout(leaveT); D.island.drag('start');
+      moving = true; body.classList.add('moving'); clearTimeout(hoverT); clearTimeout(leaveT);
+      var r = isl.getBoundingClientRect();
+      D.island.drag('start', { x: r.left, y: r.top, w: r.width, h: r.height });
     });
     g.addEventListener('pointerup', drop);
     g.addEventListener('lostpointercapture', drop);
@@ -698,6 +703,12 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   // where it was put: in the bottom half of a screen it opens upwards (main.js says)
   var up = false;
   if (D && D.island.onPlace) D.island.onPlace(function (p) {
+    if (p && p.drag) {   // carried: the window shrank around the island, which sits at its top left until the drop
+      if (!ov) return;
+      ov = Object.assign({}, ov, { drag: true }); body.classList.add('noanim');
+      var st = document.documentElement.style; st.setProperty('--ix', p.x + 'px'); st.setProperty('--iy', p.y + 'px');
+      return;
+    }
     up = !!(p && p.up);
     if (p && p.overlay) {   // moved (or first placed): straight to the new spot, no slide inside the window
       ov = p; body.classList.add('ov', 'noanim'); body.classList.remove('up'); size();
