@@ -73,16 +73,26 @@ body.notch .grip { display: none; }
 /* Menu bar mode › Adjust size: handles on the closed island's sides (the room for the notch) and bottom (its size) */
 .rh { position: absolute; display: none; z-index: 6; touch-action: none; }
 .rh::after { content: ""; position: absolute; border-radius: 3px; background: rgba(255, 255, 255, .85); box-shadow: 0 0 6px rgba(0, 0, 0, .5); }
-.rh-l, .rh-r { top: 0; bottom: 0; width: 14px; cursor: ew-resize; }
+.rh-l, .rh-r { top: 0; bottom: 12px; width: 14px; cursor: ew-resize; }
 .rh-l { left: 0; } .rh-r { right: 0; }
-.rh-l::after, .rh-r::after { top: 50%; width: 3px; height: 16px; margin-top: -8px; left: 5px; }
-.rh-b { left: 0; right: 0; bottom: 0; height: 10px; cursor: ns-resize; }
+.rh-l::after, .rh-r::after { top: 50%; width: 3px; height: 14px; margin-top: -5px; left: 5px; }
+.rh-b { left: 16px; right: 16px; bottom: 0; height: 10px; cursor: ns-resize; }
 .rh-b::after { left: 50%; width: 28px; height: 3px; margin-left: -14px; bottom: 3px; }
+.rh-bl, .rh-br { bottom: 0; width: 16px; height: 14px; }
+.rh-bl { left: 0; cursor: nesw-resize; } .rh-br { right: 0; cursor: nwse-resize; }
+.rh-bl::after, .rh-br::after { width: 7px; height: 7px; bottom: 3px; background: none; border: 0 solid rgba(255, 255, 255, .9); border-bottom-width: 2px; box-shadow: none; border-radius: 0 0 0 4px; }
+.rh-bl::after { left: 3px; border-left-width: 2px; }
+.rh-br::after { right: 3px; border-right-width: 2px; border-radius: 0 0 4px 0; }
 body.notch.mbedit #isl[data-l="0"] .rh { display: block; }
-body.notch.mbedit:not(.notched) #isl[data-l="0"] .rh-l, body.notch.mbedit:not(.notched) #isl[data-l="0"] .rh-r { display: none; }
+/* the notch's room: two knobs just below the island, at the notch's edges (a notched screen only) */
+.gk { position: fixed; z-index: 5; display: none; top: calc(var(--iy, 0px) + max(var(--bar, 24px), calc(32px * var(--ms, 1))) + 3px); width: 22px; height: 18px; margin-left: -11px; cursor: ew-resize; touch-action: none; }
+.gk::after { content: ""; position: absolute; left: 50%; top: 2px; margin-left: -5px; border: 5px solid transparent; border-bottom: 7px solid rgba(255, 255, 255, .9); filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .6)); }
+.gk-l { left: calc(var(--ix, 0px) + var(--w, 200px) / 2 - var(--nw, 0px) / 2); }
+.gk-r { left: calc(var(--ix, 0px) + var(--w, 200px) / 2 + var(--nw, 0px) / 2); }
+body.notch.notched.mbedit .gk { display: block; }
 html body.notch.mbedit #isl[data-l="0"] { outline: 1.5px dashed rgba(255, 255, 255, .55); outline-offset: 3px; cursor: default; }
 body.mbedit .pill { cursor: default; }
-.mbdone { position: fixed; z-index: 4; display: none; left: calc(var(--ix, 0px) + var(--w, 200px) / 2); top: calc(var(--iy, 0px) + max(var(--bar, 24px), calc(32px * var(--ms, 1))) + 12px);
+.mbdone { position: fixed; z-index: 4; display: none; left: calc(var(--ix, 0px) + var(--w, 200px) / 2); top: calc(var(--iy, 0px) + max(var(--bar, 24px), calc(32px * var(--ms, 1))) + 30px);
   transform: translateX(-50%); align-items: center; gap: 10px; padding: 7px 8px 7px 14px; border-radius: 14px; font-size: 12px; color: var(--ink2);
   background: rgb(16 16 24 / .78); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), 0 10px 30px rgba(0, 0, 0, .4); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); white-space: nowrap; }
 body.notch.mbedit .mbdone { display: flex; }
@@ -419,7 +429,8 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
 <div id="isl" data-l="0" data-tab="sp" data-kind="app" role="region" aria-label="Astrum">
   <canvas class="sky" aria-hidden="true"></canvas>
   <span class="glow" aria-hidden="true"></span>
-  <span class="rh rh-l" title="Drag: more or less room for the notch"></span><span class="rh rh-r" title="Drag: more or less room for the notch"></span><span class="rh rh-b" title="Drag: bigger or smaller"></span>
+  <span class="rh rh-l" title="Drag: wider or narrower"></span><span class="rh rh-r" title="Drag: wider or narrower"></span><span class="rh rh-b" title="Drag: bigger or smaller"></span>
+  <span class="rh rh-bl" title="Drag: width and size"></span><span class="rh rh-br" title="Drag: width and size"></span>
   <div class="lv pill on" title="Hover, click or drag down to open">
     <span class="ic"></span>
     <span class="pt"><span class="ptx"></span></span>
@@ -519,7 +530,8 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
 </div>
 <div class="aura" aria-hidden="true"></div>
 <div class="cards" aria-live="polite"></div>
-<div class="mbdone"><span>Drag the sides for the notch, the bottom for the size</span><button type="button" class="mbreset">Reset</button><button type="button" class="mbok">Done</button></div>
+<span class="gk gk-l" title="Drag: room for the notch"></span><span class="gk gk-r" title="Drag: room for the notch"></span>
+<div class="mbdone"><span>Sides: width · bottom: size · arrows: the notch</span><button type="button" class="mbreset">Reset</button><button type="button" class="mbok">Done</button></div>
 <script src="desktop.js"></script>
 <script>window.NP_SETUP_URL = location.origin + '/guide/spotify.html'; window.YT_SETUP_URL = 'http://localhost:' + location.port + '/guide/youtube.html';</script>
 <script src="ytmusic.js"></script>
@@ -629,7 +641,8 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
       /* the menu bar: the icon and the name left of the notch, the bars (and the badge) right of it. Both sides are as wide as
          the wider of them, so the island is centred on the notch; the name gets the left side's spare room as its width */
       var k = msK(), left = notchLeft(nameW()), right = ($('.eq').offsetParent ? (9 + 18) * k : 0) + ($('.badge').hidden ? 0 : (9 + 18) * k) + 16 * k;
-      var side = Math.ceil(Math.max(left, right));
+      var side = Math.ceil(Math.max(left, right)), minSide = Math.ceil(Math.max(right, (14 + 20 + 9 + 9) * k + 24)), chosen = Astrum.theme.get().mside;
+      if (chosen) side = Math.max(minSide, Math.round(chosen));   // Adjust size: the width you dragged it to (a long name scrolls)
       $('.pt').style.setProperty('--ptw', Math.max(0, side - (14 + 20 + 9 + 9) * k).toFixed(1) + 'px');
       return side * 2 + notchW();
     }
@@ -1050,18 +1063,25 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   }
   $('.s-mbedit').addEventListener('click', function () { setEditing(!editing); });
   document.querySelector('.mbok').addEventListener('click', function () { setEditing(false); });
-  document.querySelector('.mbreset').addEventListener('click', function () { Astrum.theme.set({ msize: 100, ngap: 210 }); });
-  $$('.rh').forEach(function (h) {
+  document.querySelector('.mbreset').addEventListener('click', function () { Astrum.theme.set({ msize: 100, ngap: 210, mside: 0 }); });
+  // what each handle changes: w (each side's width; it stays centred on the notch), s (the size), g (the notch's room)
+  var RH = { 'rh-l': ['w', -1, 0], 'rh-r': ['w', 1, 0], 'rh-b': ['s', 0, 1], 'rh-bl': ['ws', -1, 1], 'rh-br': ['ws', 1, 1], 'gk-l': ['g', -1, 0], 'gk-r': ['g', 1, 0] };
+  Array.prototype.slice.call(document.querySelectorAll('.rh, .gk')).forEach(function (h) {
+    var what = RH[Object.keys(RH).filter(function (c) { return h.classList.contains(c); })[0]];
     h.addEventListener('pointerdown', function (e) {
       if (e.button !== 0 || !editing) return;
       e.preventDefault(); e.stopPropagation(); h.setPointerCapture(e.pointerId);
-      var T = Astrum.theme.get(); rz = { side: h.classList.contains('rh-b') ? 'b' : h.classList.contains('rh-l') ? 'l' : 'r', x: e.clientX, y: e.clientY, ms: T.msize, gap: T.ngap };
+      var T = Astrum.theme.get();
+      rz = { x: e.clientX, y: e.clientY, ms: T.msize, gap: T.ngap, side: (isl.getBoundingClientRect().width - notchW()) / 2 };
       body.classList.add('noanim');
     });
     h.addEventListener('pointermove', function (e) {
       if (!rz) return;
-      if (rz.side === 'b') Astrum.theme.set({ msize: Math.max(70, Math.min(150, Math.round(rz.ms + (e.clientY - rz.y) / 32 * 100))) });
-      else { var dx = (rz.side === 'l' ? rz.x - e.clientX : e.clientX - rz.x); Astrum.theme.set({ ngap: Math.max(120, Math.min(320, Math.round(rz.gap + dx * 2))) }); }
+      var dx = (e.clientX - rz.x) * what[1], dy = (e.clientY - rz.y) * what[2], p = {};
+      if (what[0].indexOf('w') >= 0) p.mside = Math.max(40, Math.min(420, Math.round(rz.side + dx)));
+      if (what[0].indexOf('s') >= 0) p.msize = Math.max(70, Math.min(150, Math.round(rz.ms + dy / 32 * 100)));
+      if (what[0] === 'g') p.ngap = Math.max(120, Math.min(320, Math.round(rz.gap + dx * 2)));
+      Astrum.theme.set(p);
     });
     function end() { if (!rz) return; rz = null; body.classList.remove('noanim'); }
     h.addEventListener('pointerup', end); h.addEventListener('lostpointercapture', end);
