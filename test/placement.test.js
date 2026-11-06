@@ -53,3 +53,23 @@ test('snapping: near the middle, the top or the bottom it lines up exactly', () 
   const b = P.islandBounds(screens, A, a, pill);
   assert.equal(b.x, 612); assert.equal(b.y, 0);
 });
+
+test('the overlay window: one size, placed so the pill sits on its anchor; the page learns where', () => {
+  const top = P.overlayBounds(screens, A, null, 940, 900);
+  assert.deepEqual([top.x, top.y, top.width, top.height], [250, 0, 940, 860]);   // no taller than the work area
+  assert.deepEqual(top.place, { up: false, cx: 470, top: 6, bottom: 860 - 42, left: -250, right: 1190 });
+  const low = P.anchorFromWindow(screens, { x: 400, y: 800, width: 216, height: 66 }, false, 'spot');
+  const b = P.overlayBounds(screens, A, low, 940, 900);
+  assert.equal(b.up, true); assert.equal(b.place.up, true);
+  assert.equal(b.y + b.height - b.place.bottom, 860 - 24);   // the pill's bottom, 24 px above the work area's
+  const edge = P.overlayBounds(screens, A, P.anchorFromWindow(screens, { x: 2650, y: 300, width: 216, height: 66 }, false, 'spot'), 940, 900);
+  assert.equal(edge.x + edge.width, 2720); assert.equal(edge.place.right, edge.width);   // the window stays on its screen
+  assert.ok(edge.place.cx > edge.width / 2);   // the pill is off the window's centre, towards the edge
+});
+
+test('a drag moves the anchor by as far as the window went', () => {
+  const from = P.anchorAt(screens, A, null);
+  const a = P.anchorFromPoint(screens, { x: from.x + 1700, y: from.y + 300 }, 'spot');
+  assert.equal(a.display, 2);
+  assert.ok(Math.abs(P.anchorAt(screens, A, a).x - (from.x + 1700)) < 1);
+});

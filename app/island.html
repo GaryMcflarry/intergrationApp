@@ -30,6 +30,26 @@ body.np-full #isl, body.np-full .aura { opacity: 0; pointer-events: none; }
 /* placed in the bottom half of a screen, the island sits at the bottom of its window and opens upwards (main.js) */
 body.up #isl, body.up .aura { top: auto; bottom: 24px; }
 body.up #isl[data-l="3"] { top: 0; bottom: 0; }
+/* the overlay (Windows, macOS): the window keeps its size and the island moves and grows inside it, from where main.js
+   puts the pill (--ix, --iy); everything is CSS, so it is smooth. Its empty parts let clicks through to the desktop. */
+body.ov #isl, body.ov .aura { top: var(--iy, 6px); left: var(--ix, 0px); bottom: auto; transform: none;
+  transition: width .32s var(--ease), height .32s var(--ease), border-radius .32s var(--ease), left .32s var(--ease), top .32s var(--ease), opacity .26s ease; }
+body.ov #isl[data-l="3"] { top: 0; left: 0; }
+body.ov .np.in-app.mini-page { top: calc(var(--iy, 6px) + 46px) !important; left: calc(var(--ix, 0px) + var(--w, 440px) / 2) !important; }
+body.noanim #isl, body.noanim .aura { transition: none !important; }
+#isl, .aura { will-change: width, height, left, top; }
+/* glass: a frosted, see-through island with light catching its edges (Settings › Island › Glass) */
+html.glass #isl:not([data-l="3"]) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, .045) 34%, rgba(255, 255, 255, 0) 68%),
+    radial-gradient(130% 120% at 50% -25%, color-mix(in srgb, var(--acc) 12%, transparent), transparent 62%),
+    rgb(13 13 21 / var(--glass-a, .6));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), inset 0 0 0 1px rgba(255, 255, 255, .13), inset 0 -1px 0 rgba(255, 255, 255, .06),
+    inset 0 -20px 34px rgba(0, 0, 0, .16), 0 12px 34px rgba(0, 0, 0, .34);
+  backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
+html.glass #isl:not([data-l="3"])::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
+  background: linear-gradient(112deg, transparent 28%, rgba(255, 255, 255, .07) 42%, rgba(255, 255, 255, .02) 52%, transparent 62%); }
+html.glass .np.in-app .np-item:hover, html.glass .np.in-app .np-q { background: rgba(255, 255, 255, .07); }
 
 /* the aura: a soft glow of the accent around the island that breathes (a little faster while music plays) */
 .aura { position: fixed; top: 6px; left: 50%; transform: translateX(-50%); width: var(--w, 200px); height: var(--h, 36px); border-radius: var(--r, 18px); pointer-events: none; z-index: 0;
@@ -306,6 +326,8 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
           <button type="button" class="row s-aura" role="switch" aria-checked="true"><span>Pulsing aura</span><i class="tg"></i></button>
           <button type="button" class="row s-sky" role="switch" aria-checked="false"><span>Background effects</span><i class="tg"></i></button>
           <button type="button" class="row s-intro" role="switch" aria-checked="false"><span>Animate the idle pill</span><i class="tg"></i></button>
+          <button type="button" class="row s-glass" role="switch" aria-checked="true"><span>Glass</span><i class="tg"></i></button>
+          <div class="row"><span>Glass clarity</span><input type="range" class="s-clarity" min="0" max="100" aria-label="Glass clarity"><output class="s-clarityv">50</output></div>
         </div>
       </section>
       <section>
@@ -534,15 +556,27 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     if (level === 2) return [480, Math.min(620, HEAD + 70 + Math.max(160, Math.min(9, feed.messages.length || 3) * 56)), 28];
     return [window.innerWidth, window.innerHeight, 0];
   }
+  var ov = null;   // the overlay: where main.js put the pill in the window (and the screen's sides); null: the window follows the island's size
+  function placeVars(w, h) {
+    var st = document.documentElement.style;
+    var left = Math.round(Math.max(ov.left + 6, Math.min(ov.right - w - 6, ov.cx - w / 2)));   // whole on its screen, near a side too
+    var top = ov.up ? Math.round(innerHeight - ov.bottom - h) : ov.top;                         // grows away from the edge it sits on
+    st.setProperty('--ix', left + 'px'); st.setProperty('--iy', top + 'px');
+  }
   function size() {
     if (level === 3) return;
     var t = target(), s = document.documentElement.style;
+    if (ov) {   // no taller than the room it has in the window, no wider than its screen
+      t[1] = Math.min(t[1], (ov.up ? innerHeight - ov.bottom : innerHeight - ov.top) - 10);
+      t[0] = Math.min(t[0], ov.right - ov.left - 12);
+    }
     s.setProperty('--w', t[0] + 'px'); s.setProperty('--h', t[1] + 'px'); s.setProperty('--r', t[2] + 'px');
     // the contents are laid out once at the final width (the pill's and the open island's separately), so while the shape
     // grows or shrinks around them nothing re-wraps; the shape simply reveals them
     s.setProperty(level === 0 ? '--pw' : '--cw', t[0] + 'px');
     clearTimeout(shrinkT);
-    if (D) {
+    if (ov) placeVars(t[0], t[1]);
+    else if (D) {
       var ww = t[0] + 44, wh = t[1] + 30;
       if (ww >= curW && wh >= curH) { D.island.size(ww, wh); curW = ww; curH = wh; }
       else {
@@ -623,9 +657,9 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   function hoverIn() {
     clearTimeout(leaveT);
     clearTimeout(hoverT);
-    if (level !== 0 || moving) return;
+    if (level !== 0 || moving || Date.now() - dropped < 900) return;   // just let go of a drag: not a hover
     hoverT = setTimeout(function () {
-      if (level !== 0 || moving || !isl.matches(':hover') || pillGrip.matches(':hover')) return;
+      if (level !== 0 || moving || Date.now() - dropped < 900 || !isl.matches(':hover') || pillGrip.matches(':hover')) return;
       hoverOpened = true; sticky = false; go(1);
     }, 260);
   }
@@ -658,11 +692,27 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   var pillGrip = $('.pill .grip');
   pillGrip.addEventListener('mouseenter', function () { clearTimeout(hoverT); });
   pillGrip.addEventListener('mouseleave', function (e) { if (isl.contains(e.relatedTarget)) hoverIn(); });
-  function drop() { if (!moving) return; moving = false; body.classList.remove('moving'); D.island.drag('end'); }
+  var dropped = 0;
+  function drop() { if (!moving) return; moving = false; dropped = Date.now(); clearTimeout(hoverT); body.classList.remove('moving'); D.island.drag('end'); }
   Astrum.theme.onChange(function () { live(); });
   // where it was put: in the bottom half of a screen it opens upwards (main.js says)
   var up = false;
-  if (D && D.island.onPlace) D.island.onPlace(function (p) { up = !!(p && p.up); body.classList.toggle('up', up); });
+  if (D && D.island.onPlace) D.island.onPlace(function (p) {
+    up = !!(p && p.up);
+    if (p && p.overlay) {   // moved (or first placed): straight to the new spot, no slide inside the window
+      ov = p; body.classList.add('ov', 'noanim'); body.classList.remove('up'); size();
+      requestAnimationFrame(function () { requestAnimationFrame(function () { body.classList.remove('noanim'); }); });
+    } else { ov = null; body.classList.remove('ov'); body.classList.toggle('up', up); }
+  });
+  // the overlay lets clicks through wherever the mouse is not on the island (or the player, or a menu)
+  var through = null;
+  function clickThrough(v) { if (!ov || !D || !D.island.ignore || v === through) return; through = v; D.island.ignore(v); }
+  document.addEventListener('mousemove', function (e) {
+    if (!ov) return;
+    if (level === 3 || moving) { clickThrough(false); return; }
+    clickThrough(e.target === document.documentElement || e.target === body);
+  }, { passive: true });
+  document.documentElement.addEventListener('mouseleave', function () { if (level !== 3 && !moving) clickThrough(true); });
   // the shortcut (Ctrl+Shift+Space / ⌘⇧Space): closed, it opens and takes the keyboard; open, it closes to the pill
   if (D && D.island.onSummon) D.island.onSummon(function () {
     if (level === 0) { sticky = true; hoverOpened = false; D.island.focus(); go(1); }

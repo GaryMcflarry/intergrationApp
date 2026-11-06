@@ -11,7 +11,7 @@
   /* ---------- the theme ---------- */
   var PRESETS = ['#7C4DFF', '#3B82F6', '#2DD4BF', '#A3E635', '#F59E0B', '#FF6B3D', '#F43F5E', '#EC4899', '#A855F7', '#7DD3FC', '#22C55E', '#94A3B8'];
   var SOURCE = { sp: '#1ED760', yt: '#FF4E45', dc: '#5865F2' };
-  var KEY = 'astrum-theme-v1', DEF = { accent: '#1ED760', glow: 25, fullOpacity: 70, follow: true, cycle: false, every: 8, aura: false, sky: false, intro: false, v: 2 };
+  var KEY = 'astrum-theme-v1', DEF = { accent: '#1ED760', glow: 25, fullOpacity: 70, follow: true, cycle: false, every: 8, aura: false, sky: false, intro: false, glass: true, clarity: 50, v: 2 };
   var T = load(), src = null, cycleT = 0, subs = [];
 
   function load() {
@@ -32,6 +32,8 @@
     root.style.setProperty('--glow', (T.glow / 100).toFixed(2));
     root.style.setProperty('--full-opacity', (T.fullOpacity / 100).toFixed(2));
     root.classList.toggle('no-aura', !T.aura);
+    root.classList.toggle('glass', !!T.glass);
+    root.style.setProperty('--glass-a', (0.88 - 0.6 * Math.max(0, Math.min(100, +T.clarity || 0)) / 100).toFixed(2));   // clearer: more of the desktop shows
     clearInterval(cycleT);
     if (T.cycle && !T.follow) cycleT = setInterval(nextPreset, Math.max(2, +T.every || 8) * 1000);
     paint(); sky.refresh();
@@ -118,7 +120,7 @@
   }
 
   /* ---------- the settings panel ---------- */
-  var TOGGLES = [['.s-follow', 'follow'], ['.s-cycle', 'cycle'], ['.s-aura', 'aura'], ['.s-sky', 'sky'], ['.s-intro', 'intro']];
+  var TOGGLES = [['.s-follow', 'follow'], ['.s-cycle', 'cycle'], ['.s-aura', 'aura'], ['.s-sky', 'sky'], ['.s-intro', 'intro'], ['.s-glass', 'glass']];
   function mountSettings(p) {
     function q(c) { return p.querySelector(c); }
     var sw = q('.sw');
@@ -135,6 +137,8 @@
     pick.addEventListener('input', function () { setHex(pick.value); });
     var glow = q('.s-glow');
     glow.addEventListener('input', function () { theme.set({ glow: +glow.value }); });
+    var clarity = q('.s-clarity');
+    if (clarity) clarity.addEventListener('input', function () { theme.set({ clarity: +clarity.value }); });
     var fullOpacity = q('.s-full-opacity');
     fullOpacity.addEventListener('input', function () { theme.set({ fullOpacity: +fullOpacity.value }); });
     var every = q('.s-every');
@@ -148,6 +152,7 @@
       if (document.activeElement !== hex) hex.value = a;
       pick.value = a.toLowerCase(); q('.s-chip').style.setProperty('--c', a);
       glow.value = T.glow; glow.style.setProperty('--v', T.glow); q('.s-glowv').textContent = T.glow;
+      if (clarity) { clarity.value = T.clarity; clarity.style.setProperty('--v', T.clarity); q('.s-clarityv').textContent = T.clarity; clarity.disabled = !T.glass; }
       fullOpacity.value = T.fullOpacity; fullOpacity.style.setProperty('--v', T.fullOpacity); q('.s-full-opacityv').textContent = T.fullOpacity + '%';
       if (document.activeElement !== every) every.value = T.every;
       TOGGLES.forEach(function (x) { q(x[0]).setAttribute('aria-checked', String(!!T[x[1]])); });
