@@ -63,15 +63,32 @@ const place = require('./lib/placement');
 let islandSize = { width: 300, height: place.PILL + place.TOP + place.BOTTOM }, anchor = null, growUp = null;
 function anchorDisplay() { return place.anchorDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay(), anchor); }
 function islandBounds() { return place.islandBounds(screen.getAllDisplays(), screen.getPrimaryDisplay(), anchor, islandSize); }
+/* Windows and macOS: the overlay. The window keeps one size and the island opens and closes inside it with CSS alone;
+   its empty parts let clicks through (the page says when the mouse is over the island). Smooth, where resizing a
+   transparent window on every step flickers. Linux cannot pass clicks through and still see the mouse, so there the
+   window follows the island's size (ASTRUM_OVERLAY=1 tries the overlay anyway). */
+const OVERLAY = process.platform !== 'linux' || process.env.ASTRUM_OVERLAY === '1';
+const CLICK_THROUGH = OVERLAY && process.platform !== 'linux';
+const OVERLAY_SIZE = { width: 940, height: 900 };
+let lastPlace = '';
+function windowBounds() {
+  return OVERLAY ? place.overlayBounds(screen.getAllDisplays(), screen.getPrimaryDisplay(), anchor, OVERLAY_SIZE.width, OVERLAY_SIZE.height) : islandBounds();
+}
 function placeIsland() {
   if (!island || full || drag) return;
-  const b = islandBounds();
-  if (b.up !== growUp) { growUp = b.up; island.webContents.send('island-place', { up: growUp }); }   // which way the island page grows
-  island.setBounds({ x: b.x, y: b.y, width: b.width, height: b.height });
+  const b = windowBounds();
+  // which way the island page grows, and (overlay) where in the window the pill sits
+  const info = OVERLAY ? { overlay: true, ...b.place } : { up: b.up };
+  const key = JSON.stringify(info);
+  if (key !== lastPlace) { lastPlace = key; growUp = b.up; island.webContents.send('island-place', info); }
+  const cur = island.getBounds();
+  if (cur.x !== b.x || cur.y !== b.y || cur.width !== b.width || cur.height !== b.height) island.setBounds({ x: b.x, y: b.y, width: b.width, height: b.height });
 }
-// a drop: where the window was let go becomes the new anchor (lib/placement.js), kept for next time
-function setAnchorFromWindow() {
-  anchor = place.anchorFromWindow(screen.getAllDisplays(), island.getBounds(), !!growUp, store.settings().placement);
+function setClickThrough(on) { if (island && CLICK_THROUGH) island.setIgnoreMouseEvents(!!on, { forward: true }); }
+// a drop: the anchor moves by as much as the window was dragged (snapped to an edge or the middle, lib/placement.js), kept for next time
+function setAnchorFromDrag(start) {
+  const b = island.getBounds(), from = place.anchorAt(screen.getAllDisplays(), screen.getPrimaryDisplay(), anchor);
+  anchor = place.anchorFromPoint(screen.getAllDisplays(), { x: from.x + b.x - start.x, y: from.y + b.y - start.y }, store.settings().placement);
   store.setSettings({ bounds: anchor });
 }
 
@@ -115,13 +132,15 @@ function dragIsland(phase) {
     const c = screen.getCursorScreenPoint(), b = island.getBounds();
     // the window follows the mouse, keeping its size: moved between screens of different scaling, Windows would
     // otherwise resize it on the way (and the island would jump away from the mouse)
-    drag = { dx: c.x - b.x, dy: c.y - b.y, w: b.width, h: b.height, timer: setInterval(() => {
+    setClickThrough(false);
+    drag = { start: { x: b.x, y: b.y }, dx: c.x - b.x, dy: c.y - b.y, w: b.width, h: b.height, timer: setInterval(() => {
       if (!island) return; const p = screen.getCursorScreenPoint();
       island.setBounds({ x: p.x - drag.dx, y: p.y - drag.dy, width: drag.w, height: drag.h });
     }, 16) };
   } else if (phase === 'end' && drag) {   // let go: it stays there, on that screen
+    const start = drag.start;
     stopDrag();
-    setAnchorFromWindow();
+    setAnchorFromDrag(start);
     placeIsland();
   }
 }
@@ -129,7 +148,7 @@ function createIsland() {
   islandSize = { width: 300, height: place.PILL + place.TOP + place.BOTTOM }; growUp = null;
   const saved = store.settings().bounds;
   anchor = saved && Number.isFinite(saved.fx) && Number.isFinite(saved.fy) ? saved : null;
-  const first = islandBounds();
+  const first = windowBounds(); lastPlace = '';
   island = new BrowserWindow({
     x: first.x, y: first.y, width: first.width, height: first.height,
     frame: false, transparent: true, resizable: false, movable: false, minimizable: false, maximizable: false, fullscreenable: false,
@@ -146,7 +165,7 @@ function createIsland() {
     if (u.origin === ORIGIN || u.origin === GOOGLE) openGuide(url); else shell.openExternal(url);
   });
   island.loadURL(ORIGIN + '/island.html');
-  island.webContents.on('did-finish-load', () => { growUp = null; placeIsland(); });   // tells the page which way it grows
+  island.webContents.on('did-finish-load', () => { growUp = null; lastPlace = ''; placeIsland(); setClickThrough(true); });   // tells the page which way it grows
   island.once('ready-to-show', () => island.showInactive());
   island.on('closed', () => { stopDrag(); island = null; full = null; });
 }
@@ -207,6 +226,8 @@ function wire() {
   });
   ipcMain.on('island', (e, what, a, b) => {
     if (!fromApp(e) || !island || BrowserWindow.fromWebContents(e.sender) !== island) return;
+    if (what === 'ignore') { if (!drag && !full) setClickThrough(!!a); return; }
+    if (what === 'size' && OVERLAY) return;   // the overlay keeps its size
     if (what === 'size' && Number.isFinite(a) && Number.isFinite(b)) {
       islandSize = { width: Math.max(120, Math.round(a)), height: Math.max(40, Math.round(b)) };
       placeIsland();
@@ -220,7 +241,7 @@ function wire() {
     if (!fromApp(e) || !island || BrowserWindow.fromWebContents(e.sender) !== island) return false;
     if (on) {
       if (!full) full = island.getBounds();
-      stopDrag();
+      stopDrag(); setClickThrough(false);
       const bounds = screen.getDisplayMatching(full).bounds;
       island.setBounds(bounds);
       island.focus();

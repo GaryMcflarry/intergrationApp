@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('desktop', {
   settings: { get: () => ipcRenderer.invoke('settings-get'), set: (patch) => ipcRenderer.invoke('settings-set', patch), onChange: onSettings },
   island: {
     size: (w, h) => ipcRenderer.send('island', 'size', Number(w), Number(h)),
+    ignore: (on) => ipcRenderer.send('island', 'ignore', !!on),   // the overlay: let clicks through to the desktop (the mouse is off the island)
     drag: (phase) => ipcRenderer.send('island', 'drag', phase === 'start' ? 'start' : 'end'),   // the window follows the mouse until 'end'
     state: (level) => ipcRenderer.send('island', 'state', Number(level) || 0),   // how open it is (Follow the mouse moves only the closed pill)
     full: (on2) => ipcRenderer.invoke('island-full', !!on2),
