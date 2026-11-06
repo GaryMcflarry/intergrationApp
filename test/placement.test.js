@@ -57,7 +57,7 @@ test('snapping: near the middle, the top or the bottom it lines up exactly', () 
 test('the overlay window: one size, placed so the pill sits on its anchor; the page learns where', () => {
   const top = P.overlayBounds(screens, A, null, 940, 900);
   assert.deepEqual([top.x, top.y, top.width, top.height], [250, 0, 940, 860]);   // no taller than the work area
-  assert.deepEqual(top.place, { up: false, cx: 470, top: 6, bottom: 860 - 42, left: -250, right: 1190 });
+  assert.deepEqual(top.place, { up: false, height: 860, cx: 470, top: 6, bottom: 860 - 42, left: -250, right: 1190, notch: false, bar: 0 });
   const low = P.anchorFromWindow(screens, { x: 400, y: 800, width: 216, height: 66 }, false, 'spot');
   const b = P.overlayBounds(screens, A, low, 940, 900);
   assert.equal(b.up, true); assert.equal(b.place.up, true);
@@ -72,4 +72,16 @@ test('a drag moves the anchor by as far as the window went', () => {
   const a = P.anchorFromPoint(screens, { x: from.x + 1700, y: from.y + 300 }, 'spot');
   assert.equal(a.display, 2);
   assert.ok(Math.abs(P.anchorAt(screens, A, a).x - (from.x + 1700)) < 1);
+});
+
+test('the menu bar (macOS): hangs from the very top of its screen, over the menu bar, and opens downwards', () => {
+  const M = { id: 3, bounds: { x: 0, y: 0, width: 1512, height: 982 }, workArea: { x: 0, y: 38, width: 1512, height: 944 } };   // a notched MacBook
+  const n = P.notchAt(M);
+  const b = P.overlayBounds([M], M, n, 940, 900);
+  assert.equal(b.y, 0); assert.equal(b.up, false);                 // above the work area: on the menu bar
+  assert.equal(b.place.top, 0); assert.equal(b.place.bar, 38); assert.equal(b.place.notch, true);
+  assert.equal(b.x + b.place.cx, 756);                              // centred on the notch
+  const low = P.anchorFromPoint([M], { x: 300, y: 800 }, 'notch');  // dropped anywhere: back to that screen's top
+  assert.deepEqual(low, n);
+  assert.equal(P.islandBounds([M], M, n, { width: 216, height: 66 }).y, 0);
 });

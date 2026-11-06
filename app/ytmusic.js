@@ -504,7 +504,19 @@ window.YTMusic = (function () {
       track: trackObj,
       toggle: function () { $('.np-play').click(); }, next: function () { $('.np-next').click(); }, prev: function () { $('.np-prev').click(); }, pip: function () { $('.np-pip').click(); },
       pause: function () { if (player && playing) try { player.pauseVideo(); } catch (e) { } },
-      playing: function () { return playing; }
+      playing: function () { return playing; },
+      // the island's type bar: a search in the Search band (a video link plays straight away)
+      search: function (q) {
+        q = String(q || '').trim(); if (!q) return;
+        setPane('search'); $('.yt-sform input').value = q;
+        var video = videoLink(q);
+        if (video) { searchSerial++; start({ video: video }, 'YouTube video'); } else search(q, '', []);
+      },
+      // the island's volume tile (0-100; null when nothing is loaded)
+      volume: function (v) {
+        if (!player || !player.getVolume) return null;
+        try { if (v != null) { player.setVolume(Math.max(0, Math.min(100, +v))); if (+v > 0 && player.isMuted && player.isMuted()) player.unMute(); } return v != null ? +v : player.getVolume(); } catch (e) { return null; }
+      }
     };
   }
 
