@@ -27,6 +27,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   overflow: hidden; z-index: 1; transition: width .26s var(--ease), height .26s var(--ease), border-radius .26s ease; }
 #isl[data-l="3"] { top: 0; left: 0; transform: none; width: 100%; height: 100%; border-radius: 0; background: rgb(5 5 11 / var(--full-opacity)); box-shadow: none; }
 body.np-full #isl, body.np-full .aura { opacity: 0; pointer-events: none; }
+/* placed in the bottom half of a screen, the island sits at the bottom of its window and opens upwards (main.js) */
+body.up #isl, body.up .aura { top: auto; bottom: 24px; }
+body.up #isl[data-l="3"] { top: 0; bottom: 0; }
 
 /* the aura: a soft glow of the accent around the island that breathes (a little faster while music plays) */
 .aura { position: fixed; top: 6px; left: 50%; transform: translateX(-50%); width: var(--w, 200px); height: var(--h, 36px); border-radius: var(--r, 18px); pointer-events: none; z-index: 0;
@@ -183,6 +186,14 @@ body.moving, body.moving * { cursor: grabbing !important; }
   background: linear-gradient(var(--acc), var(--acc)) 0 0 / calc(var(--v, 60) * 1%) 100% no-repeat, rgba(255, 255, 255, .14); }
 .setp input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .5); }
 /* a switch */
+.row.stack { flex-wrap: wrap; padding: 10px 14px; gap: 8px; }
+.row.stack > span:first-child { flex-basis: 100%; }
+.segs { display: flex; flex-wrap: wrap; gap: 3px; padding: 3px; border-radius: 10px; background: rgba(255, 255, 255, .06); }
+.segs button { padding: 5px 10px; border-radius: 7px; font-size: 12px; color: var(--ink2); white-space: nowrap; }
+.segs button:hover { color: #fff; }
+.segs button[aria-pressed="true"] { color: #fff; background: rgba(255, 255, 255, .15); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acc) 45%, transparent); }
+.s-keynote { flex-basis: 100%; color: var(--ink2); font-size: 11.5px; }
+.s-keynote:empty { display: none; }
 .tg { position: relative; width: 36px; height: 21px; flex: none; border-radius: 11px; background: rgba(255, 255, 255, .16); transition: background .3s ease; }
 .tg::after { content: ""; position: absolute; top: 2px; left: 2px; width: 17px; height: 17px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); transition: transform .35s var(--ease); }
 [aria-checked="true"] > .tg { background: var(--acc); }
@@ -295,7 +306,17 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
           <button type="button" class="row s-aura" role="switch" aria-checked="true"><span>Pulsing aura</span><i class="tg"></i></button>
           <button type="button" class="row s-sky" role="switch" aria-checked="false"><span>Background effects</span><i class="tg"></i></button>
           <button type="button" class="row s-intro" role="switch" aria-checked="false"><span>Animate the idle pill</span><i class="tg"></i></button>
-          <button type="button" class="row s-roam" role="switch" aria-checked="true"><span>Follow the mouse to other screens</span><i class="tg"></i></button>
+        </div>
+      </section>
+      <section>
+        <h3>Position</h3>
+        <div class="grp">
+          <div class="row stack"><span>Where it stays</span><span class="segs s-place" role="group" aria-label="Where it stays">
+            <button type="button" data-v="spot" title="Stays where you drop it (drag it by its grip)">This spot</button>
+            <button type="button" data-v="screen" title="Stays at the top middle of the screen you drop it on">This screen</button>
+            <button type="button" data-v="roam" title="Goes to the screen your mouse is on">Follow the mouse</button></span></div>
+          <button type="button" class="row s-top" role="switch" aria-checked="true"><span>Stay on top of other apps</span><i class="tg"></i></button>
+          <div class="row stack"><span>Shortcut to call it</span><span class="segs s-key" role="group" aria-label="Shortcut"></span><small class="s-keynote"></small></div>
         </div>
       </section>
     </div></div>
@@ -534,6 +555,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   function render() {
     setOpen = level === 2 && panel === 'set';
     isl.dataset.l = String(level); isl.dataset.tab = tab;
+    if (D && D.island.state) D.island.state(level);
     $$('.tabs button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.t === tab)); });
     var more = $('.h-more'), moreLabel = level >= 2 ? 'Show less' : 'Expand';
     more.setAttribute('aria-expanded', String(level >= 2)); more.setAttribute('aria-label', moreLabel); more.title = moreLabel;
@@ -545,7 +567,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     $('.setp').classList.toggle('on', setOpen);
     var np = level === 2 && tab !== 'dc' && !setOpen;
     body.classList.toggle('show-np', np);
-    tint(); live(); report();
+    tint(); live();
     api.setPanelActive(level > 0 && tab === 'sp' && !setOpen);
     if (np) { api.setSource(tab); api.setBig(true); }
     if (level === 1) paintPeek();
@@ -618,8 +640,9 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   document.documentElement.addEventListener('mouseleave', hoverOut);
 
   /* ---------- moving it: the grip, and arriving on another screen ---------- */
-  // pressing a grip (in the pill, or beside the close button) moves the window with the mouse (main.js); letting go puts
-  // the island at the top middle of that screen. The grip is part of the island, so the press is always the island's.
+  // pressing a grip (in the pill, or beside the close button) moves the window with the mouse (main.js); letting go leaves
+  // the island there, on that screen (near an edge or the middle it snaps to it). The grip is part of the island, so the
+  // press is always the island's.
   var moving = false;
   $$('.grip').forEach(function (g) {
     g.addEventListener('pointerdown', function (e) {
@@ -636,9 +659,34 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   pillGrip.addEventListener('mouseenter', function () { clearTimeout(hoverT); });
   pillGrip.addEventListener('mouseleave', function (e) { if (isl.contains(e.relatedTarget)) hoverIn(); });
   function drop() { if (!moving) return; moving = false; body.classList.remove('moving'); D.island.drag('end'); }
-  // main.js moves the closed island to the screen the mouse is on (Settings › Follow the mouse to other screens)
-  function report() { if (D && D.island.state) D.island.state(Astrum.theme.get().roam, level); }
-  Astrum.theme.onChange(function () { live(); report(); });
+  Astrum.theme.onChange(function () { live(); });
+  // where it was put: in the bottom half of a screen it opens upwards (main.js says)
+  var up = false;
+  if (D && D.island.onPlace) D.island.onPlace(function (p) { up = !!(p && p.up); body.classList.toggle('up', up); });
+  // the shortcut (Ctrl+Shift+Space / ⌘⇧Space): closed, it opens and takes the keyboard; open, it closes to the pill
+  if (D && D.island.onSummon) D.island.onSummon(function () {
+    if (level === 0) { sticky = true; hoverOpened = false; D.island.focus(); go(1); }
+    else if (level < 3) { sticky = false; go(0); }
+  });
+  /* Position: where it stays, on top of other apps or not, the shortcut (kept by the app: main.js) */
+  function paintPosition(st) {
+    if (!st) return;
+    $$('.s-place button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === (st.placement || 'spot'))); });
+    $('.s-top').setAttribute('aria-checked', String(st.alwaysOnTop !== false));
+    var keys = $('.s-key'), opts = st.mac ? [['CommandOrControl+Shift+Space', '⌘⇧Space'], ['Alt+Space', '⌥Space'], ['', 'Off']] : [['CommandOrControl+Shift+Space', 'Ctrl+Shift+Space'], ['Alt+Space', 'Alt+Space'], ['', 'Off']];
+    if (!keys.childNodes.length) opts.forEach(function (o) {
+      var b = el('button', null, o[1]); b.type = 'button'; b.dataset.v = o[0];
+      b.addEventListener('click', function () { D.settings.set({ shortcut: o[0] }).then(paintPosition); });
+      keys.appendChild(b);
+    });
+    $$('.s-key button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === (st.shortcut || ''))); });
+    $('.s-keynote').textContent = st.shortcut && st.shortcutOk === false ? 'Another app already uses this shortcut: pick another.' : st.shortcut ? 'Press it anywhere to open Astrum; again to close it.' : '';
+  }
+  if (D && D.settings.set) {
+    $$('.s-place button').forEach(function (b) { b.addEventListener('click', function () { D.settings.set({ placement: b.dataset.v }).then(paintPosition); }); });
+    $('.s-top').addEventListener('click', function () { D.settings.set({ alwaysOnTop: this.getAttribute('aria-checked') !== 'true' }).then(paintPosition); });
+    D.settings.get().then(paintPosition); D.settings.onChange(paintPosition);
+  }
   $('.pill').addEventListener('click', function () { clearTimeout(hoverT); sticky = true; hoverOpened = false; if (D) D.island.focus(); go(1); });
   $$('.tabs button').forEach(function (b) {
     b.addEventListener('click', function () { sticky = true; tab = b.dataset.t; panel = null; if (level === 3) { go(2); } render(); });
@@ -652,12 +700,12 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   $('.h-more').addEventListener('click', function () { sticky = true; go(level >= 2 ? 1 : 2); });
   $('.h-full').addEventListener('click', function () { go(3); });
   $('.h-up').addEventListener('click', function () { sticky = false; go(0); });
-  // drag: down for more, up for less (from the pill, the head or the grab bar)
+  // drag: away from the edge it sits on for more (down, or up when at the bottom), back for less (the pill, the head, the grab bar)
   var dragY = null;
   function dragStart(e) { if (e.button !== 0 || e.target.closest('button') && !e.target.closest('.pill')) return; dragY = e.clientY; }
   [$('.pill'), $('.head'), $('.grab')].forEach(function (n) { n.addEventListener('pointerdown', dragStart); });
   window.addEventListener('pointermove', function (e) {
-    if (dragY == null) return; var dy = e.clientY - dragY;
+    if (dragY == null) return; var dy = (up ? -1 : 1) * (e.clientY - dragY);   // at the bottom of a screen, up opens it
     if (dy > 26 && level < 2) { dragY = e.clientY; sticky = true; clearTimeout(hoverT); go(level + 1); }
     else if (dy < -26 && level > 0 && level < 3) { dragY = e.clientY; go(level - 1); }
   });

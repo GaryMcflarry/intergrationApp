@@ -3,7 +3,7 @@
    - the island: a small pill (what plays, or Discord) that opens into tabs, then the full player, then the whole screen
    - set-up happens in your browser: guide pages served by this app connect each service and hand the result over
    - Discord: Rich Presence follows what plays, a bot of yours brings in the latest messages, Share posts a song */
-const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage, screen, dialog, safeStorage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage, screen, dialog, safeStorage, globalShortcut } = require('electron');
 const path = require('node:path');
 const server = require('./lib/server');
 const { createStore } = require('./lib/store');
@@ -55,22 +55,60 @@ async function setBotToken(token) {
 }
 
 /* ---------- the island window ---------- */
-let islandSize = { width: 300, height: 64 };
-function workArea() { return screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea; }
-function islandBounds(d) {
-  const width = Math.min(d.width, islandSize.width), height = Math.min(d.height, islandSize.height);
-  return { x: Math.round(d.x + (d.width - width) / 2), y: d.y, width, height };
-}
-function islandDisplay() { return screen.getDisplayMatching(island.getBounds()); }
-function placeIsland(display) {   // at the top middle of a screen (its own, unless another is given)
+/* Where the island sits: an anchor, the closed pill's centre on one screen (kept as a share of that screen's work area,
+   so it survives a change of resolution, and saved for next time). It stays on that screen until you drag it to
+   another. Opening grows away from the nearer edge: downwards in the top half of the screen, upwards in the bottom half,
+   and near a side it opens towards the middle, so it is always whole on the screen. */
+const place = require('./lib/placement');
+let islandSize = { width: 300, height: place.PILL + place.TOP + place.BOTTOM }, anchor = null, growUp = null;
+function anchorDisplay() { return place.anchorDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay(), anchor); }
+function islandBounds() { return place.islandBounds(screen.getAllDisplays(), screen.getPrimaryDisplay(), anchor, islandSize); }
+function placeIsland() {
   if (!island || full || drag) return;
-  island.setBounds(islandBounds((display || islandDisplay()).workArea));
+  const b = islandBounds();
+  if (b.up !== growUp) { growUp = b.up; island.webContents.send('island-place', { up: growUp }); }   // which way the island page grows
+  island.setBounds({ x: b.x, y: b.y, width: b.width, height: b.height });
+}
+// a drop: where the window was let go becomes the new anchor (lib/placement.js), kept for next time
+function setAnchorFromWindow() {
+  anchor = place.anchorFromWindow(screen.getAllDisplays(), island.getBounds(), !!growUp, store.settings().placement);
+  store.setSettings({ bounds: anchor });
 }
 
-/* ---------- moving the island: dragged by its handle, or following the mouse to another screen ---------- */
-// roam: the island goes to whichever screen the mouse is on (only while it is a closed pill); the island page says
-// whether that is wanted (a setting) and how open it is
-let roam = false, islandLevel = 0, drag = null;
+// Position › Follow the mouse: the closed pill goes to the screen the mouse is on, at the same spot on it
+let islandLevel = 0;
+setInterval(() => {
+  if (!island || full || drag || islandLevel > 0 || !island.isVisible() || store.settings().placement !== 'roam') return;
+  const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  if (d.id === anchorDisplay().id) return;
+  anchor = place.followTo(d, anchor);
+  placeIsland();
+}, 350);
+// Position › This screen: straight to the top middle of the screen it is on
+function pinToScreen() {
+  anchor = place.topMiddle(anchorDisplay());
+  store.setSettings({ bounds: anchor }); placeIsland();
+}
+// Stay on top of other apps (or be an ordinary window that apps can cover)
+function applyOnTop() { if (island) island.setAlwaysOnTop(!!store.settings().alwaysOnTop, 'screen-saver'); }
+
+/* ---------- the shortcut: calls the island from anywhere (Ctrl+Shift+Space, or ⌘⇧Space on a Mac, by default) ---------- */
+const SHORTCUTS = new Set(['CommandOrControl+Shift+Space', 'Alt+Space', 'CommandOrControl+Shift+M', '']);
+let shortcutOk = true;
+function summon() {
+  if (!island) { createIsland(); return; }
+  if (!island.isVisible()) island.showInactive();
+  island.moveTop();
+  island.webContents.send('island-summon');   // closed: it opens (and takes the keyboard); open: it closes to the pill
+}
+function registerShortcut() {
+  globalShortcut.unregisterAll(); shortcutOk = true;
+  const acc = store.settings().shortcut; if (!acc) return;
+  try { shortcutOk = globalShortcut.register(acc, summon); } catch { shortcutOk = false; }   // false: another app has it
+}
+
+/* ---------- moving the island: dragged by its grip ---------- */
+let drag = null;
 function stopDrag() { if (drag) { clearInterval(drag.timer); drag = null; } }
 function dragIsland(phase) {
   if (phase === 'start' && !full && !drag) {
@@ -81,26 +119,25 @@ function dragIsland(phase) {
       if (!island) return; const p = screen.getCursorScreenPoint();
       island.setBounds({ x: p.x - drag.dx, y: p.y - drag.dy, width: drag.w, height: drag.h });
     }, 16) };
-  } else if (phase === 'end' && drag) {   // let go: to the top middle of the screen it was dropped on
+  } else if (phase === 'end' && drag) {   // let go: it stays there, on that screen
     stopDrag();
-    placeIsland(screen.getDisplayNearestPoint(screen.getCursorScreenPoint()));
+    setAnchorFromWindow();
+    placeIsland();
   }
 }
-setInterval(() => {
-  if (!island || full || drag || !roam || islandLevel > 0 || !island.isVisible()) return;
-  const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-  if (d.id !== islandDisplay().id) placeIsland(d);
-}, 350);
 function createIsland() {
-  islandSize = { width: 300, height: 64 };
+  islandSize = { width: 300, height: place.PILL + place.TOP + place.BOTTOM }; growUp = null;
+  const saved = store.settings().bounds;
+  anchor = saved && Number.isFinite(saved.fx) && Number.isFinite(saved.fy) ? saved : null;
+  const first = islandBounds();
   island = new BrowserWindow({
-    ...islandBounds(workArea()),
+    x: first.x, y: first.y, width: first.width, height: first.height,
     frame: false, transparent: true, resizable: false, movable: false, minimizable: false, maximizable: false, fullscreenable: false,
     hasShadow: false, skipTaskbar: true, alwaysOnTop: true, show: false, title: 'Astrum', backgroundColor: '#00000000',
     icon: nativeImage.createFromDataURL(ICON),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false }
   });
-  island.setAlwaysOnTop(true, 'screen-saver');
+  applyOnTop();
   if (process.platform === 'darwin') island.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   island.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   island.webContents.on('will-navigate', (e, url) => {   // the island never leaves; set-up pages open in your browser
@@ -109,6 +146,7 @@ function createIsland() {
     if (u.origin === ORIGIN || u.origin === GOOGLE) openGuide(url); else shell.openExternal(url);
   });
   island.loadURL(ORIGIN + '/island.html');
+  island.webContents.on('did-finish-load', () => { growUp = null; placeIsland(); });   // tells the page which way it grows
   island.once('ready-to-show', () => island.showInactive());
   island.on('closed', () => { stopDrag(); island = null; full = null; });
 }
@@ -139,10 +177,13 @@ function applySettings(patch) {
   if (now.discordId !== before.discordId) presence.connect(now.discordId);
   if (now.presence !== before.presence) presence.setEnabled(now.presence);
   if ('channels' in patch) bot.refresh().catch(() => {});
+  if ('alwaysOnTop' in patch) applyOnTop();
+  if ('shortcut' in patch) registerShortcut();
+  if (patch.placement === 'screen' && before.placement !== 'screen') pinToScreen();
   sendAll('settings', publicSettings());
   return now;
 }
-function publicSettings() { const s = store.settings(); return { alwaysOnTop: s.alwaysOnTop, openAtLogin: s.openAtLogin, discordId: !!s.discordId, presence: s.presence, webhook: !!s.webhook, bot: !!s.botToken, channels: s.channels }; }
+function publicSettings() { const s = store.settings(); return { alwaysOnTop: s.alwaysOnTop, placement: s.placement, shortcut: s.shortcut, shortcutOk, mac: process.platform === 'darwin', openAtLogin: s.openAtLogin, discordId: !!s.discordId, presence: s.presence, webhook: !!s.webhook, bot: !!s.botToken, channels: s.channels }; }
 function setKv(key, value) { if (store.set(key, value)) sendAll('kv-changed', { key, value: value == null ? null : String(value) }); }
 
 /* ---------- what the island may ask ---------- */
@@ -154,6 +195,16 @@ function wire() {
     for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed() && w.webContents !== e.sender) w.webContents.send('kv-changed', { key: String(key), value: value == null ? null : String(value) });
   });
   ipcMain.handle('settings-get', (e) => (fromApp(e) ? publicSettings() : null));
+  ipcMain.handle('settings-set', (e, patch) => {   // the island's own settings: where it stays, on top or not, the shortcut, starting with the computer
+    if (!fromApp(e) || !patch || typeof patch !== 'object') return null;
+    const clean = {};
+    if (['spot', 'screen', 'roam'].includes(patch.placement)) clean.placement = patch.placement;
+    if ('alwaysOnTop' in patch) clean.alwaysOnTop = !!patch.alwaysOnTop;
+    if (typeof patch.shortcut === 'string' && SHORTCUTS.has(patch.shortcut)) clean.shortcut = patch.shortcut;
+    if ('openAtLogin' in patch) clean.openAtLogin = !!patch.openAtLogin;
+    applySettings(clean);
+    return publicSettings();
+  });
   ipcMain.on('island', (e, what, a, b) => {
     if (!fromApp(e) || !island || BrowserWindow.fromWebContents(e.sender) !== island) return;
     if (what === 'size' && Number.isFinite(a) && Number.isFinite(b)) {
@@ -161,7 +212,7 @@ function wire() {
       placeIsland();
     }
     else if (what === 'drag') dragIsland(a);
-    else if (what === 'state') { roam = !!a; islandLevel = Number(b) || 0; }
+    else if (what === 'state') islandLevel = Number(a) || 0;
     else if (what === 'focus') island.focus();
     else if (what === 'blur') island.blur();
   });
@@ -175,8 +226,7 @@ function wire() {
       island.focus();
       return { width: bounds.width, height: bounds.height };
     } else if (full) {
-      const previousDisplay = screen.getDisplayMatching(full);
-      full = null; placeIsland(previousDisplay);
+      full = null; placeIsland();
     }
     return true;
   });
@@ -209,8 +259,10 @@ app.whenReady().then(async () => {
   }
   wire();
   screen.on('display-metrics-changed', () => { placeIsland(); if (island) island.webContents.send('island-reflow'); });
+  screen.on('display-removed', () => placeIsland());   // its screen is gone: the main screen, until it comes back
   createIsland();
   buildTray();
+  registerShortcut();
   const s = store.settings();
   presence.setEnabled(s.presence);
   presence.connect(s.discordId);
@@ -219,5 +271,6 @@ app.whenReady().then(async () => {
   if (!store.get('np-client') && !store.get('yt-client') && !s.discordId && !s.botToken) setTimeout(() => openGuide('index'), 1500);
 });
 app.on('second-instance', () => { if (island) { island.showInactive(); island.webContents.send('island-poke'); } });
+app.on('will-quit', () => globalShortcut.unregisterAll());
 app.on('before-quit', () => { quitting = true; if (store) store.flush(); if (presence) presence.stop(); if (bot) bot.stop(); });
 app.on('window-all-closed', () => { /* stays in the tray */ });

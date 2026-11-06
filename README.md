@@ -7,6 +7,8 @@ A **Dynamic Island for your desktop**: a small black pill at the top of the scre
 - **Open it further** (drag down again, or ⌄) for the full player (queue, search, library with playlists to open and shuffle, devices, likes, the DJ) or your Discord channels.
 - **Cover the whole screen** (⛶) with any of the three: the music's full view (the cover as a card that tilts toward the mouse), DJ mode, or Discord.
 - **Drag up**, press **Esc**, or use the close button to return to the smaller view.
+- **Move it** by its grip (the dots): it stays where you drop it, on that screen, and remembers the spot. Near the top or bottom edge, or the middle, it snaps into line. In the bottom half of a screen it opens **upwards**; near a side it opens towards the middle.
+- **Settings → Position**: *This spot* (where you drop it), *This screen* (the top middle of the screen you drop it on) or *Follow the mouse* (the closed pill goes to the screen your mouse is on); **Stay on top of other apps** on or off; and a **shortcut** to call it from anywhere: **Ctrl+Shift+Space** on Windows, **⌘⇧Space** on a Mac (or Alt/⌥+Space, or off). Press it again to close it.
 
 ## Set-up happens in your browser
 
