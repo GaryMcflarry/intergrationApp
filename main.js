@@ -13,7 +13,6 @@ const { createSpotifyAuth } = require('./lib/spotify-auth');
 const { createApi } = require('./lib/api');
 const ICON = require('./lib/icon');
 const systemControls = require('./lib/system');
-const notchInfo = require('./lib/notch');
 
 const ORIGIN = `http://127.0.0.1:${server.PORT}`;     // the island, the guides, Spotify's return address
 const GOOGLE = `http://localhost:${server.PORT}`;     // the YouTube guide (Google signs in here)
@@ -26,7 +25,8 @@ app.userAgentFallback = app.userAgentFallback.replace(/\s?Electron\/\S+/, '').re
 if (!app.requestSingleInstanceLock()) app.quit();
 
 const MAC = process.platform === 'darwin';
-const NOTCH_OK = MAC || process.env.ASTRUM_NOTCH === '1';   // In the menu bar is a Mac's (ASTRUM_NOTCH=1 tries it elsewhere)
+// Menu bar mode (Top bar mode on Windows): the island flush at the very top of a screen (ASTRUM_NOTCH=1 tries it on Linux)
+const NOTCH_OK = MAC || process.platform === 'win32' || process.env.ASTRUM_NOTCH === '1';
 let island = null, tray = null, store = null, presence = null, bot = null, quitting = false, full = null, lastStatus = { text: 'Starting…', ok: false };
 
 function sendAll(channel, payload) { for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload); }
@@ -82,8 +82,7 @@ function placeIsland() {
   if (!island || full || drag) return;
   const b = windowBounds();
   // which way the island page grows, and (overlay) where in the window the pill sits
-  const nw = notchWidths[anchorDisplay().id];   // macOS: the measured notch of its screen (0: none; undefined: not known)
-  const info = OVERLAY ? { overlay: true, ...b.place, ...(Number.isFinite(nw) ? { nw } : {}) } : { up: b.up };
+  const info = OVERLAY ? { overlay: true, ...b.place } : { up: b.up };
   const key = JSON.stringify(info);
   if (key !== lastPlace) { lastPlace = key; growUp = b.up; island.webContents.send('island-place', info); }
   const cur = island.getBounds();
@@ -210,7 +209,7 @@ function buildTray() {
   const menu = () => Menu.buildFromTemplate([
     { label: 'Show the island', click: () => { if (!island) createIsland(); else island.showInactive(); } },
     { label: 'Hide the island', click: () => island && island.hide() },
-    ...(NOTCH_OK ? [{ label: 'Menu bar mode', type: 'checkbox', checked: store.settings().placement === 'notch',
+    ...(NOTCH_OK ? [{ label: MAC ? 'Menu bar mode' : 'Top bar mode', type: 'checkbox', checked: store.settings().placement === 'notch',
       click: (m) => { applySettings({ placement: m.checked ? 'notch' : 'screen' }); } }] : []),
     { type: 'separator' },
     { label: 'Set up (opens in your browser)…', click: () => openGuide('index') },
@@ -246,12 +245,6 @@ function applySettings(patch) {
   if ('placement' in patch) { applyOnTop(); trayTitle(); if (tray) tray.refresh(); }
   sendAll('settings', publicSettings());
   return now;
-}
-// macOS: each screen's notch, measured (lib/notch.js), so Menu bar mode leaves exactly its width free
-let notchWidths = {};
-function measureNotches() {
-  if (!MAC) return;
-  notchInfo.measure(screen.getAllDisplays()).then((w) => { notchWidths = w; lastPlace = ''; placeIsland(); });
 }
 // the screens, for Menu bar mode's screen picker (which one the island hangs from)
 function screensInfo() {
@@ -352,10 +345,8 @@ app.whenReady().then(async () => {
   }
   wire();
   screen.on('display-metrics-changed', () => { placeIsland(); if (island) island.webContents.send('island-reflow'); });
-  screen.on('display-removed', () => { placeIsland(); sendAll('settings', publicSettings()); measureNotches(); });
-  screen.on('display-added', () => { sendAll('settings', publicSettings()); measureNotches(); });
-  screen.on('display-metrics-changed', () => measureNotches());
-  measureNotches();   // its screen is gone: the main screen, until it comes back
+  screen.on('display-removed', () => { placeIsland(); sendAll('settings', publicSettings()); });
+  screen.on('display-added', () => sendAll('settings', publicSettings()));   // its screen is gone: the main screen, until it comes back
   createIsland();
   buildTray();
   registerShortcut();
