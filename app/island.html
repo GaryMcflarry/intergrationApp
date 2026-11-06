@@ -54,12 +54,18 @@ html.glass .np.in-app .np-item:hover, html.glass .np.in-app .np-q { background: 
 /* macOS > Menu bar mode: the island hangs from the top of the screen like the notch grown wider; closed it is the menu
    bar's height and black like the notch, with the icon on one side of it and the bars and grip on the other */
 body.notch #isl:not([data-l="3"]) { border-top-left-radius: 0; border-top-right-radius: 0; }
-html body.notch #isl[data-l="0"] { height: max(var(--bar, 24px), 32px); background: #000; box-shadow: 0 6px 18px rgba(0, 0, 0, .3); backdrop-filter: none; -webkit-backdrop-filter: none; }
+html body.notch #isl[data-l="0"] { height: max(var(--bar, 24px), calc(32px * var(--ms, 1))); background: #000; box-shadow: 0 6px 18px rgba(0, 0, 0, .3); backdrop-filter: none; -webkit-backdrop-filter: none; }
 html body.notch #isl[data-l="0"]::after, body.notch .aura { display: none; }
-body.notch .pill { height: max(var(--bar, 24px), 32px); padding: 0 16px 0 14px; }
+/* Settings › Menu bar › Size scales it all (--ms); it is never shorter than the menu bar */
+body.notch .pill { height: max(var(--bar, 24px), calc(32px * var(--ms, 1))); padding: 0 calc(16px * var(--ms, 1)) 0 calc(14px * var(--ms, 1)); gap: calc(9px * var(--ms, 1)); }
+body.notch .pill .ic, body.notch .pill .ic svg { width: calc(20px * var(--ms, 1)); height: calc(20px * var(--ms, 1)); }
+body.notch .pill .pt { font-size: calc(12.5px * var(--ms, 1)); }
+body.notch .pill .eq { height: calc(14px * var(--ms, 1)); gap: calc(2px * var(--ms, 1)); }
+body.notch .pill .eq i { width: calc(3px * var(--ms, 1)); }
+body.notch .pill .badge { min-width: calc(18px * var(--ms, 1)); height: calc(18px * var(--ms, 1)); font-size: calc(11px * var(--ms, 1)); padding: 0 calc(5px * var(--ms, 1)); }
 /* the song's name on the left of the notch, the bars on its right (--nw: the notch's width; the island is placed so the
    gap sits under it); no grip: it lives on the notch, so there is nothing to drag */
-body.notch .pill .pt { flex: 0 1 auto; max-width: 210px; }
+body.notch .pill .pt { flex: 0 1 auto; max-width: calc(210px * var(--ms, 1)); }
 body.notch .pill .pt:not(.mq) { -webkit-mask: none; mask: none; }
 body.notch .pill .idle { display: none !important; }
 body.notch .pill .nsp { display: block; }
@@ -134,7 +140,7 @@ button.tile:active { transform: scale(.96); }
 /* the drop-down cards: a song that started, a Discord message; a glass card floats just below the closed island (above
    it, when it sits at the bottom of a screen), then goes */
 .cards { position: fixed; z-index: 4; width: 340px; left: calc(var(--ix, 0px) + var(--w, 200px) / 2); top: calc(var(--iy, 6px) + var(--h, 36px) + 10px); transform: translateX(-50%); pointer-events: none; }
-body.notch .cards { top: calc(var(--iy, 0px) + max(var(--bar, 24px), 32px) + 10px); }
+body.notch .cards { top: calc(var(--iy, 0px) + max(var(--bar, 24px), calc(32px * var(--ms, 1))) + 10px); }
 body.ovup .cards { top: auto; bottom: calc(100vh - var(--iy, 6px) + 10px); }
 body:not(.ov) .cards { display: none; }
 .card { pointer-events: auto; position: relative; display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 12px; row-gap: 2px; align-items: center; padding: 14px; border-radius: 22px;
@@ -458,6 +464,8 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
         <div class="grp">
           <button type="button" class="row s-menubar" role="switch" aria-checked="false"><span>Menu bar mode</span><i class="tg"></i></button>
           <div class="row stack s-mbscreen" hidden><span>Screen</span><span class="segs s-screens" role="group" aria-label="Which screen"></span></div>
+          <div class="row s-mbsize" hidden><span>Size</span><input type="range" class="s-msize" min="70" max="150" step="5" aria-label="Size of the island in the menu bar"><output class="s-msizev">100%</output></div>
+          <div class="row s-mbgap" hidden><span>Notch gap</span><input type="range" class="s-ngap" min="120" max="320" step="2" aria-label="Room left for the notch"><output class="s-ngapv">210</output></div>
         </div>
         <p class="hint">The island hangs from the notch at the top of your screen, and the song playing is written in the menu bar. Click Astrum's menu bar icon to open it.</p>
       </section>
@@ -583,19 +591,27 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   }
   var measure = document.createElement('canvas').getContext('2d');
   function pillWidth() {
+    if (ov && ov.notch) {   // the menu bar: the icon and the name left of the notch, the bars (and the badge) right of it
+      var k = msK(), nl = notchLeft(nameW());
+      return Math.round(nl + notchW() + ($('.eq').offsetParent ? (9 + 18) * k : 0) + ($('.badge').hidden ? 0 : (9 + 18) * k) + 16 * k);
+    }
     measure.font = '600 12.5px "Chakra Petch", "Segoe UI", system-ui, sans-serif';
     var w = measure.measureText($('.ptx').dataset.text || '').width;
-    if (ov && ov.notch) {   // the menu bar: the icon and the name left of the notch, the bars (and the badge) right of it
-      var nl = notchLeft(w);
-      return Math.round(nl + notchW() + ($('.eq').offsetParent ? 9 + 18 : 0) + ($('.badge').hidden ? 0 : 9 + 18) + 16);
-    }
     if (isl.dataset.kind === 'app') return 172;
     return Math.round(Math.max(190, Math.min(360, 9 + 20 + 9 + w + 9 + 18 + 9 + 12 + 14 + ($('.badge').hidden ? 0 : 26))));   // icon, name, bars, grip
   }
   // a notched Mac has a tall menu bar (37 px or so): the gap for its notch; otherwise there is no notch to go round
-  function notchW() { return ov && ov.notch && ov.bar >= 30 ? 210 : 0; }
-  function notchLeft(textW) {   // the pill's part left of the notch: padding, icon, gap, the name (up to 210 px), gap
-    return 14 + 20 + 9 + Math.ceil(Math.min(210, (textW || 0) + 6)) + 9;
+  function notched() { return !!(ov && ov.notch && ov.bar >= 30); }
+  function notchW() { return notched() ? Astrum.theme.get().ngap : 0; }   // Settings › Menu bar › Notch gap
+  function msK() { return (Astrum.theme.get().msize || 100) / 100; }      // Settings › Menu bar › Size
+  function nameW() { measure.font = '600 ' + (12.5 * msK()).toFixed(2) + 'px "Chakra Petch", "Segoe UI", system-ui, sans-serif'; return measure.measureText($('.ptx').dataset.text || '').width; }
+  function notchLeft(textW) {   // the pill's part left of the notch: padding, icon, gap, the name (up to 210 px at 100%), gap
+    var k = msK();
+    return (14 + 20 + 9) * k + Math.ceil(Math.min(210 * k, (textW || 0) + 6)) + 9 * k;
+  }
+  // the size and the gap, as CSS (and the island is placed again)
+  function notchVars() {
+    var st = document.documentElement.style; st.setProperty('--ms', msK().toFixed(3)); st.setProperty('--nw', notchW() + 'px');
   }
   function marquee() {
     var pt = $('.pt'), sp = $('.ptx'), d = sp.scrollWidth - pt.clientWidth;
@@ -784,8 +800,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     var st = document.documentElement.style;
     var left = Math.round(Math.max(ov.left + 6, Math.min(ov.right - w - 6, ov.cx - w / 2)));   // whole on its screen, near a side too
     if (ov.notch && level === 0 && notchW()) {   // closed on a notch: placed so the gap between the name and the bars sits under it
-      measure.font = '600 12.5px "Chakra Petch", "Segoe UI", system-ui, sans-serif';
-      left = Math.round(ov.cx - notchW() / 2 - notchLeft(measure.measureText($('.ptx').dataset.text || '').width));
+      left = Math.round(ov.cx - notchW() / 2 - notchLeft(nameW()));
     }
     var top = ov.up ? Math.round(winH() - ov.bottom - h) : ov.top;                         // grows away from the edge it sits on
     st.setProperty('--ix', left + 'px'); st.setProperty('--iy', top + 'px');
@@ -928,7 +943,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   pillGrip.addEventListener('mouseleave', function (e) { if (isl.contains(e.relatedTarget)) hoverIn(); });
   var dropped = 0;
   function drop() { if (!moving) return; moving = false; dropped = Date.now(); clearTimeout(hoverT); body.classList.remove('moving'); D.island.drag('end'); }
-  Astrum.theme.onChange(function () { live(); });
+  Astrum.theme.onChange(function () { live(); notchVars(); if (level === 0 && ov && ov.notch) size(); });
   // where it was put: in the bottom half of a screen it opens upwards (main.js says)
   var up = false;
   if (D && D.island.onPlace) D.island.onPlace(function (p) {
@@ -942,7 +957,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     if (p && p.overlay) {   // moved (or first placed): straight to the new spot, no slide inside the window
       ov = p; body.classList.add('ov', 'noanim'); body.classList.remove('up');
       body.classList.toggle('notch', !!p.notch); body.classList.toggle('ovup', !!p.up); document.documentElement.style.setProperty('--bar', (p.bar || 24) + 'px');
-      document.documentElement.style.setProperty('--nw', (p.notch && p.bar >= 30 ? 210 : 0) + 'px');
+      notchVars(); if (D && D.settings.get && paintPosition.ready) D.settings.get().then(paintPosition);
       size();
       requestAnimationFrame(function () { requestAnimationFrame(function () { body.classList.remove('noanim'); }); });
     } else { ov = null; body.classList.remove('ov', 'ovup'); body.classList.toggle('up', up); }
@@ -963,7 +978,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   });
   /* Position: where it stays, on top of other apps or not, the shortcut (kept by the app: main.js) */
   function paintPosition(st) {
-    if (!st) return;
+    if (!st) return; paintPosition.ready = true;
     $$('.s-place button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === (st.placement || 'spot'))); });
     $('.s-mbsec').hidden = !st.notchOk;   // a Mac's
     var nb = st.placement === 'notch';
@@ -971,6 +986,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     // in Menu bar mode it is always on top and lives on a notch: only the screen is chosen
     $('.s-where').hidden = nb; $('.s-top').hidden = nb;
     $('.s-mbscreen').hidden = !nb || !(st.screens && st.screens.length > 1);
+    $('.s-mbsize').hidden = !nb; $('.s-mbgap').hidden = !nb || !notched();   // the gap only matters on a screen with a notch
     var ss = $('.s-screens'); ss.textContent = '';
     (st.screens || []).forEach(function (d) {
       var b = el('button', null, d.name); b.type = 'button'; b.title = d.size + (d.primary ? ' · main screen' : '');
@@ -988,6 +1004,14 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     $$('.s-key button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === (st.shortcut || ''))); });
     $('.s-keynote').textContent = st.shortcut && st.shortcutOk === false ? 'Another app already uses this shortcut: pick another.' : st.shortcut ? 'Press it anywhere to open Astrum; again to close it.' : '';
   }
+  // Size and Notch gap (kept with the look, in this computer)
+  function rangeOf(cls, key, unit) {
+    var r = $('.' + cls), o = $('.' + cls + 'v');
+    function show() { var v = Astrum.theme.get()[key]; r.value = v; o.textContent = v + unit; r.style.setProperty('--v', ((v - r.min) / (r.max - r.min) * 100).toFixed(1)); }
+    r.addEventListener('input', function () { var p = {}; p[key] = +r.value; Astrum.theme.set(p); });
+    Astrum.theme.onChange(show); show();
+  }
+  rangeOf('s-msize', 'msize', '%'); rangeOf('s-ngap', 'ngap', ' px');
   if (D && D.settings.set) {
     $$('.s-place button').forEach(function (b) { b.addEventListener('click', function () { D.settings.set({ placement: b.dataset.v }).then(paintPosition); }); });
     $('.s-top').addEventListener('click', function () { D.settings.set({ alwaysOnTop: this.getAttribute('aria-checked') !== 'true' }).then(paintPosition); });
