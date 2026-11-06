@@ -139,6 +139,9 @@ jobs:
             args+=(-c.forceCodeSigning=true)
           else
             unset CSC_LINK CSC_KEY_PASSWORD
+            # ad-hoc signing (no certificate, nothing secret): electron-builder skips all signing on pull requests unless told,
+            # and an unsigned app fails the signature check below
+            export CSC_FOR_PULL_REQUEST=true
             args+=(-c.mac.identity=- -c.mac.hardenedRuntime=false)
           fi
           npx --no-install electron-builder --mac dmg "--$ARCH" --publish never "${args[@]}"
