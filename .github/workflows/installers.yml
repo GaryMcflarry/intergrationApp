@@ -1,13 +1,24 @@
-name: Test desktop installers
+name: Desktop installers
 
+# Builds, installs and starts Astrum on Windows and both kinds of Mac.
+#   pull requests       build and test only
+#   a push to main      also refreshes the "Latest build" pre-release (direct downloads of the newest main)
+#   a tag like v1.1.0   publishes that version as a release (the tag must match package.json: `npm version minor`)
 on:
   workflow_dispatch:
+  pull_request:
+    paths: [.github/workflows/installers.yml, 'deploy/**', 'app/**', 'lib/**', 'build/**', main.js, preload.js, package.json, package-lock.json]
   push:
     branches: [main]
-    paths: [.github/workflows/installers.yml, 'deploy/**', 'app/guide/**']
+    tags: ['v*']   # (GitHub does not apply path filters to tag pushes: a version tag always builds)
+    paths: [.github/workflows/installers.yml, 'deploy/**', 'app/**', 'lib/**', 'build/**', main.js, preload.js, package.json, package-lock.json]
 
 permissions:
   contents: read
+
+concurrency:
+  group: installers-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   website:
@@ -46,6 +57,10 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24'
+      - name: A version tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME" || { echo "::error::Tag $GITHUB_REF_NAME does not match package.json; use npm version"; exit 1; }
       - run: npm ci
       - run: npm test
       - run: npm run check
@@ -157,3 +172,51 @@ jobs:
           name: Astrum-macOS-${{ matrix.arch }}
           path: dist/*.dmg
           if-no-files-found: error
+
+  # the downloads: "Latest build" for main, a versioned release for a tag (Windows installer, Mac DMGs for Apple silicon and Intel)
+  release:
+    name: Publish downloads
+    needs: [windows, mac]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          path: built
+      - name: Publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="$GITHUB_REF_NAME"; v="${tag#v}"; suffix="-$v"; title="Astrum $v"; kind=(--latest)
+          else
+            tag=latest-build; suffix=""; title="Latest build (main, ${GITHUB_SHA::7})"; kind=(--prerelease)
+          fi
+          mkdir up
+          cp built/Astrum-Windows-x64/*.exe "up/Astrum-Setup${suffix}.exe"
+          cp built/Astrum-macOS-arm64/*.dmg "up/Astrum${suffix}-mac-Apple-silicon.dmg"
+          cp built/Astrum-macOS-x64/*.dmg "up/Astrum${suffix}-mac-Intel.dmg"
+          (cd up && sha256sum * > SHA256SUMS.txt)
+          {
+            echo "**Windows:** Astrum-Setup${suffix}.exe · **Mac:** the Apple silicon DMG for M1 and newer, the Intel DMG for older Macs."
+            echo
+            echo "These builds are not signed yet, so each system warns the first time:"
+            echo "- **Windows:** SmartScreen says it protected your PC: press **More info**, then **Run anyway**."
+            echo "- **Mac:** open the DMG and drag Astrum to Applications. The first time it is blocked: open **System Settings → Privacy & Security**, scroll down and press **Open Anyway** next to Astrum."
+            echo
+            echo "Built from ${GITHUB_SHA}."
+            echo
+            echo '```'
+            cat up/SHA256SUMS.txt
+            echo '```'
+          } > notes.md
+          if [[ "$tag" == latest-build ]]; then
+            gh release delete latest-build --cleanup-tag --yes 2>/dev/null || true
+          fi
+          gh release create "$tag" up/* --target "$GITHUB_SHA" --title "$title" --notes-file notes.md "${kind[@]}"
