@@ -643,6 +643,10 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
       var k = msK(), left = notchLeft(nameW()), right = ($('.eq').offsetParent ? (9 + 18) * k : 0) + ($('.badge').hidden ? 0 : (9 + 18) * k) + 16 * k;
       var side = Math.ceil(Math.max(left, right)), minSide = Math.ceil(Math.max(right, (14 + 20 + 9 + 9) * k + 24)), chosen = Astrum.theme.get().mside;
       if (chosen) side = Math.max(minSide, Math.round(chosen));   // Adjust size: the width you dragged it to (a long name scrolls)
+      else if (!notchW()) {   // no notch on this screen: just the icon, the name and the bars, snug
+        $('.pt').style.setProperty('--ptw', Math.max(0, left - (14 + 20 + 9 + 9) * k).toFixed(1) + 'px');
+        return Math.ceil(left + right);
+      }
       $('.pt').style.setProperty('--ptw', Math.max(0, side - (14 + 20 + 9 + 9) * k).toFixed(1) + 'px');
       return side * 2 + notchW();
     }
@@ -652,8 +656,13 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     return Math.round(Math.max(190, Math.min(360, 9 + 20 + 9 + w + 9 + 18 + 9 + 12 + 14 + ($('.badge').hidden ? 0 : 26))));   // icon, name, bars, grip
   }
   // a notched Mac has a tall menu bar (37 px or so): the gap for its notch; otherwise there is no notch to go round
-  function notched() { return !!(ov && ov.notch && ov.bar >= 30); }
-  function notchW() { return notched() ? Astrum.theme.get().ngap : 0; }   // Settings › Menu bar › Notch gap
+  // the notch: measured by main.js on a Mac (ov.nw; 0: this screen has none), else guessed from a notch-tall menu bar
+  function notched() { return !!(ov && ov.notch && (Number.isFinite(ov.nw) ? ov.nw > 0 : ov.bar >= 30)); }
+  function notchW() {   // the room left for it: what you dragged it to, else the notch and a little to spare
+    if (!notched()) return 0;
+    var g = Astrum.theme.get().notchGap; if (g) return g;
+    return Number.isFinite(ov.nw) && ov.nw > 0 ? ov.nw + 12 : 200;
+  }
   function msK() { return (Astrum.theme.get().msize || 100) / 100; }      // Settings › Menu bar › Size
   function nameW() { measure.font = '600 ' + (12.5 * msK()).toFixed(2) + 'px "Chakra Petch", "Segoe UI", system-ui, sans-serif'; return measure.measureText($('.ptx').dataset.text || '').width; }
   function notchLeft(textW) {   // the pill's part left of the notch: padding, icon, gap, the name (up to 210 px at 100%), gap
@@ -1063,7 +1072,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   }
   $('.s-mbedit').addEventListener('click', function () { setEditing(!editing); });
   document.querySelector('.mbok').addEventListener('click', function () { setEditing(false); });
-  document.querySelector('.mbreset').addEventListener('click', function () { Astrum.theme.set({ msize: 100, ngap: 210, mside: 0 }); });
+  document.querySelector('.mbreset').addEventListener('click', function () { Astrum.theme.set({ msize: 100, notchGap: 0, mside: 0 }); });
   // what each handle changes: w (each side's width; it stays centred on the notch), s (the size), g (the notch's room)
   var RH = { 'rh-l': ['w', -1, 0], 'rh-r': ['w', 1, 0], 'rh-b': ['s', 0, 1], 'rh-bl': ['ws', -1, 1], 'rh-br': ['ws', 1, 1], 'gk-l': ['g', -1, 0], 'gk-r': ['g', 1, 0] };
   Array.prototype.slice.call(document.querySelectorAll('.rh, .gk')).forEach(function (h) {
@@ -1072,7 +1081,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
       if (e.button !== 0 || !editing) return;
       e.preventDefault(); e.stopPropagation(); h.setPointerCapture(e.pointerId);
       var T = Astrum.theme.get();
-      rz = { x: e.clientX, y: e.clientY, ms: T.msize, gap: T.ngap, side: (isl.getBoundingClientRect().width - notchW()) / 2 };
+      rz = { x: e.clientX, y: e.clientY, ms: T.msize, gap: notchW(), side: (isl.getBoundingClientRect().width - notchW()) / 2 };
       body.classList.add('noanim');
     });
     h.addEventListener('pointermove', function (e) {
@@ -1080,7 +1089,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
       var dx = (e.clientX - rz.x) * what[1], dy = (e.clientY - rz.y) * what[2], p = {};
       if (what[0].indexOf('w') >= 0) p.mside = Math.max(40, Math.min(420, Math.round(rz.side + dx)));
       if (what[0].indexOf('s') >= 0) p.msize = Math.max(70, Math.min(150, Math.round(rz.ms + dy / 32 * 100)));
-      if (what[0] === 'g') p.ngap = Math.max(120, Math.min(320, Math.round(rz.gap + dx * 2)));
+      if (what[0] === 'g') p.notchGap = Math.max(60, Math.min(360, Math.round(rz.gap + dx * 2)));
       Astrum.theme.set(p);
     });
     function end() { if (!rz) return; rz = null; body.classList.remove('noanim'); }

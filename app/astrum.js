@@ -11,7 +11,7 @@
   /* ---------- the theme ---------- */
   var PRESETS = ['#7C4DFF', '#3B82F6', '#2DD4BF', '#A3E635', '#F59E0B', '#FF6B3D', '#F43F5E', '#EC4899', '#A855F7', '#7DD3FC', '#22C55E', '#94A3B8'];
   var SOURCE = { sp: '#1ED760', yt: '#FF4E45', dc: '#5865F2' };
-  var KEY = 'astrum-theme-v1', DEF = { accent: '#1ED760', glow: 25, fullOpacity: 70, follow: true, cycle: false, every: 8, aura: false, sky: false, intro: false, glass: true, clarity: 50, cards: true, cardSong: true, cardMsg: true, cardPing: true, cardSecs: 7, cardMute: [], snooze: 0, msize: 100, ngap: 210, mside: 0, v: 2 };
+  var KEY = 'astrum-theme-v1', DEF = { accent: '#1ED760', glow: 25, fullOpacity: 70, follow: true, cycle: false, every: 8, aura: false, sky: false, intro: false, glass: true, clarity: 50, cards: true, cardSong: true, cardMsg: true, cardPing: true, cardSecs: 7, cardMute: [], snooze: 0, msize: 100, notchGap: 0, mside: 0, v: 2 };
   var T = load(), src = null, cycleT = 0, subs = [];
 
   function load() {
@@ -24,7 +24,7 @@
     if ([4, 7, 12].indexOf(+t.cardSecs) < 0) t.cardSecs = 7;
     t.msize = Math.max(70, Math.min(150, Number.isFinite(+t.msize) ? +t.msize : DEF.msize));   // Menu bar mode: the closed island's size (%)
     t.mside = Math.max(0, Math.min(420, Number.isFinite(+t.mside) ? +t.mside : 0));          // ... and each side's width (0: fits the name)
-    t.ngap = Math.max(120, Math.min(320, Number.isFinite(+t.ngap) ? +t.ngap : DEF.ngap));      // ... and the gap left for the notch (px)
+    t.notchGap = Math.max(0, Math.min(360, Number.isFinite(+t.notchGap) ? +t.notchGap : 0));   // ... and the room for the notch (px; 0: the measured notch)
     return t;
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(T)); } catch (e) { } }

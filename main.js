@@ -13,6 +13,7 @@ const { createSpotifyAuth } = require('./lib/spotify-auth');
 const { createApi } = require('./lib/api');
 const ICON = require('./lib/icon');
 const systemControls = require('./lib/system');
+const notchInfo = require('./lib/notch');
 
 const ORIGIN = `http://127.0.0.1:${server.PORT}`;     // the island, the guides, Spotify's return address
 const GOOGLE = `http://localhost:${server.PORT}`;     // the YouTube guide (Google signs in here)
@@ -81,7 +82,8 @@ function placeIsland() {
   if (!island || full || drag) return;
   const b = windowBounds();
   // which way the island page grows, and (overlay) where in the window the pill sits
-  const info = OVERLAY ? { overlay: true, ...b.place } : { up: b.up };
+  const nw = notchWidths[anchorDisplay().id];   // macOS: the measured notch of its screen (0: none; undefined: not known)
+  const info = OVERLAY ? { overlay: true, ...b.place, ...(Number.isFinite(nw) ? { nw } : {}) } : { up: b.up };
   const key = JSON.stringify(info);
   if (key !== lastPlace) { lastPlace = key; growUp = b.up; island.webContents.send('island-place', info); }
   const cur = island.getBounds();
@@ -245,6 +247,12 @@ function applySettings(patch) {
   sendAll('settings', publicSettings());
   return now;
 }
+// macOS: each screen's notch, measured (lib/notch.js), so Menu bar mode leaves exactly its width free
+let notchWidths = {};
+function measureNotches() {
+  if (!MAC) return;
+  notchInfo.measure(screen.getAllDisplays()).then((w) => { notchWidths = w; lastPlace = ''; placeIsland(); });
+}
 // the screens, for Menu bar mode's screen picker (which one the island hangs from)
 function screensInfo() {
   const prim = screen.getPrimaryDisplay().id;
@@ -344,8 +352,10 @@ app.whenReady().then(async () => {
   }
   wire();
   screen.on('display-metrics-changed', () => { placeIsland(); if (island) island.webContents.send('island-reflow'); });
-  screen.on('display-removed', () => { placeIsland(); sendAll('settings', publicSettings()); });
-  screen.on('display-added', () => sendAll('settings', publicSettings()));   // its screen is gone: the main screen, until it comes back
+  screen.on('display-removed', () => { placeIsland(); sendAll('settings', publicSettings()); measureNotches(); });
+  screen.on('display-added', () => { sendAll('settings', publicSettings()); measureNotches(); });
+  screen.on('display-metrics-changed', () => measureNotches());
+  measureNotches();   // its screen is gone: the main screen, until it comes back
   createIsland();
   buildTray();
   registerShortcut();
