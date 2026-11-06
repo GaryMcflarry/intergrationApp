@@ -11,7 +11,7 @@
   /* ---------- the theme ---------- */
   var PRESETS = ['#7C4DFF', '#3B82F6', '#2DD4BF', '#A3E635', '#F59E0B', '#FF6B3D', '#F43F5E', '#EC4899', '#A855F7', '#7DD3FC', '#22C55E', '#94A3B8'];
   var SOURCE = { sp: '#1ED760', yt: '#FF4E45', dc: '#5865F2' };
-  var KEY = 'astrum-theme-v1', DEF = { accent: '#1ED760', glow: 25, fullOpacity: 70, follow: true, cycle: false, every: 8, aura: false, sky: false, intro: false, glass: true, clarity: 50, cards: true, msize: 100, ngap: 210, v: 2 };
+  var KEY = 'astrum-theme-v1', DEF = { accent: '#1ED760', glow: 25, fullOpacity: 70, follow: true, cycle: false, every: 8, aura: false, sky: false, intro: false, glass: true, clarity: 50, cards: true, cardSong: true, cardMsg: true, cardPing: true, cardSecs: 7, cardMute: [], snooze: 0, msize: 100, ngap: 210, v: 2 };
   var T = load(), src = null, cycleT = 0, subs = [];
 
   function load() {
@@ -20,6 +20,8 @@
     if (s && !s.v) { t.sky = false; t.v = 2; }   // the backdrop became optional (off) after the first version
     if (!/^#[0-9a-f]{6}$/i.test(t.accent)) t.accent = DEF.accent;
     t.fullOpacity = Math.max(0, Math.min(100, Number.isFinite(+t.fullOpacity) ? +t.fullOpacity : DEF.fullOpacity));
+    if (!Array.isArray(t.cardMute)) t.cardMute = [];
+    if ([4, 7, 12].indexOf(+t.cardSecs) < 0) t.cardSecs = 7;
     t.msize = Math.max(70, Math.min(150, Number.isFinite(+t.msize) ? +t.msize : DEF.msize));   // Menu bar mode: the closed island's size (%)
     t.ngap = Math.max(120, Math.min(320, Number.isFinite(+t.ngap) ? +t.ngap : DEF.ngap));      // ... and the gap left for the notch (px)
     return t;
@@ -122,7 +124,7 @@
   }
 
   /* ---------- the settings panel ---------- */
-  var TOGGLES = [['.s-follow', 'follow'], ['.s-cycle', 'cycle'], ['.s-aura', 'aura'], ['.s-sky', 'sky'], ['.s-intro', 'intro'], ['.s-glass', 'glass'], ['.s-cards', 'cards']];
+  var TOGGLES = [['.s-follow', 'follow'], ['.s-cycle', 'cycle'], ['.s-aura', 'aura'], ['.s-sky', 'sky'], ['.s-intro', 'intro'], ['.s-glass', 'glass'], ['.s-cards', 'cards'], ['.s-csong', 'cardSong'], ['.s-cmsg', 'cardMsg'], ['.s-cping', 'cardPing']];
   function mountSettings(p) {
     function q(c) { return p.querySelector(c); }
     var sw = q('.sw');

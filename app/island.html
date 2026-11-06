@@ -65,11 +65,30 @@ body.notch .pill .eq i { width: calc(3px * var(--ms, 1)); }
 body.notch .pill .badge { min-width: calc(18px * var(--ms, 1)); height: calc(18px * var(--ms, 1)); font-size: calc(11px * var(--ms, 1)); padding: 0 calc(5px * var(--ms, 1)); }
 /* the song's name on the left of the notch, the bars on its right (--nw: the notch's width; the island is placed so the
    gap sits under it); no grip: it lives on the notch, so there is nothing to drag */
-body.notch .pill .pt { flex: 0 1 auto; max-width: calc(210px * var(--ms, 1)); }
+body.notch .pill .pt { flex: none; width: var(--ptw, auto); max-width: none; }
 body.notch .pill .pt:not(.mq) { -webkit-mask: none; mask: none; }
 body.notch .pill .idle { display: none !important; }
 body.notch .pill .nsp { display: block; }
 body.notch .grip { display: none; }
+/* Menu bar mode › Adjust size: handles on the closed island's sides (the room for the notch) and bottom (its size) */
+.rh { position: absolute; display: none; z-index: 6; touch-action: none; }
+.rh::after { content: ""; position: absolute; border-radius: 3px; background: rgba(255, 255, 255, .85); box-shadow: 0 0 6px rgba(0, 0, 0, .5); }
+.rh-l, .rh-r { top: 0; bottom: 0; width: 14px; cursor: ew-resize; }
+.rh-l { left: 0; } .rh-r { right: 0; }
+.rh-l::after, .rh-r::after { top: 50%; width: 3px; height: 16px; margin-top: -8px; left: 5px; }
+.rh-b { left: 0; right: 0; bottom: 0; height: 10px; cursor: ns-resize; }
+.rh-b::after { left: 50%; width: 28px; height: 3px; margin-left: -14px; bottom: 3px; }
+body.notch.mbedit #isl[data-l="0"] .rh { display: block; }
+body.notch.mbedit:not(.notched) #isl[data-l="0"] .rh-l, body.notch.mbedit:not(.notched) #isl[data-l="0"] .rh-r { display: none; }
+html body.notch.mbedit #isl[data-l="0"] { outline: 1.5px dashed rgba(255, 255, 255, .55); outline-offset: 3px; cursor: default; }
+body.mbedit .pill { cursor: default; }
+.mbdone { position: fixed; z-index: 4; display: none; left: calc(var(--ix, 0px) + var(--w, 200px) / 2); top: calc(var(--iy, 0px) + max(var(--bar, 24px), calc(32px * var(--ms, 1))) + 12px);
+  transform: translateX(-50%); align-items: center; gap: 10px; padding: 7px 8px 7px 14px; border-radius: 14px; font-size: 12px; color: var(--ink2);
+  background: rgb(16 16 24 / .78); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), 0 10px 30px rgba(0, 0, 0, .4); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); white-space: nowrap; }
+body.notch.mbedit .mbdone { display: flex; }
+.mbdone button { padding: 5px 12px; border-radius: 9px; font-weight: 700; color: #000; background: var(--acc); }
+.mbdone .mbreset { color: var(--ink); background: rgba(255, 255, 255, .12); }
+
 /* the notch glow: while music plays, light in the accent (and pink, and cyan) spills from under the notch; a Discord
    message makes it pulse blue */
 .glow { position: absolute; left: 10%; right: 10%; bottom: 0; height: 2px; border-radius: 2px; pointer-events: none; opacity: 0; z-index: 2;
@@ -203,7 +222,7 @@ body.moving, body.moving * { cursor: grabbing !important; }
 .ic .star { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--acc) 70%, transparent)); }
 .pt { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; font-weight: 600; font-size: 12.5px; letter-spacing: .01em; -webkit-mask: linear-gradient(90deg, #000 85%, transparent); mask: linear-gradient(90deg, #000 85%, transparent); }
 .pt span { display: inline-block; }
-.nsp { display: none; flex: none; width: var(--nw, 0px); margin: 0 auto; }
+.nsp { display: none; flex: none; width: var(--nw, 0px); margin-right: auto; }
 .pt.mq span { animation: mq var(--mqd, 12s) ease-in-out infinite alternate; }
 @keyframes mq { 0%, 15% { transform: none; } 85%, 100% { transform: translateX(var(--mq, 0)); } }
 .eq { display: flex; align-items: flex-end; gap: 2px; height: 14px; flex: none; }
@@ -339,6 +358,8 @@ body.moving, body.moving * { cursor: grabbing !important; }
 [aria-checked="true"] > .tg { background: var(--acc); }
 [aria-checked="true"] > .tg::after { transform: translateX(15px); }
 .every { transition: opacity .3s; } .every.off { opacity: .4; pointer-events: none; }
+.set-scroll [hidden] { display: none !important; }   /* rows that do not apply here (a .row is a flex box, which beats [hidden]) */
+.n-sub { transition: opacity .3s; } .n-off .n-sub { opacity: .4; pointer-events: none; }
 .every input { width: 44px; font: 500 13px/1 "Chakra Petch", monospace; color: var(--ink); text-align: right; background: none; border: 0; padding: 4px 0; }
 .every input:focus { outline: none; color: var(--acc); }
 .every small { color: var(--ink2); font-size: 12px; }
@@ -398,6 +419,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
 <div id="isl" data-l="0" data-tab="sp" data-kind="app" role="region" aria-label="Astrum">
   <canvas class="sky" aria-hidden="true"></canvas>
   <span class="glow" aria-hidden="true"></span>
+  <span class="rh rh-l" title="Drag: more or less room for the notch"></span><span class="rh rh-r" title="Drag: more or less room for the notch"></span><span class="rh rh-b" title="Drag: bigger or smaller"></span>
   <div class="lv pill on" title="Hover, click or drag down to open">
     <span class="ic"></span>
     <span class="pt"><span class="ptx"></span></span>
@@ -456,16 +478,27 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
           <button type="button" class="row s-intro" role="switch" aria-checked="false"><span>Animate the idle pill</span><i class="tg"></i></button>
           <button type="button" class="row s-glass" role="switch" aria-checked="true"><span>Glass</span><i class="tg"></i></button>
           <div class="row"><span>Glass clarity</span><input type="range" class="s-clarity" min="0" max="100" aria-label="Glass clarity"><output class="s-clarityv">50</output></div>
-          <button type="button" class="row s-cards" role="switch" aria-checked="true"><span>Pop-up cards (new songs, Discord messages)</span><i class="tg"></i></button>
         </div>
+      </section>
+      <section>
+        <h3>Notifications</h3>
+        <div class="grp">
+          <button type="button" class="row s-cards" role="switch" aria-checked="true"><span>Pop-up cards</span><i class="tg"></i></button>
+          <button type="button" class="row s-csong n-sub" role="switch" aria-checked="true"><span>When a new song starts</span><i class="tg"></i></button>
+          <button type="button" class="row s-cmsg n-sub" role="switch" aria-checked="true"><span>Discord messages</span><i class="tg"></i></button>
+          <div class="row stack n-sub s-cchans" hidden><span>From these channels</span><span class="segs s-chans" role="group" aria-label="Channels that pop up"></span></div>
+          <button type="button" class="row s-cping" role="switch" aria-checked="true"><span>Glow pulse for messages (Menu bar mode)</span><i class="tg"></i></button>
+          <div class="row stack n-sub"><span>Stay on screen for</span><span class="segs s-csecs" role="group" aria-label="How long a card stays"><button type="button" data-v="4">4 sec</button><button type="button" data-v="7">7 sec</button><button type="button" data-v="12">12 sec</button></span></div>
+          <div class="row"><span class="s-snoozet">Pause notifications</span><span class="segs s-snooze" role="group" aria-label="Pause notifications"><button type="button" data-v="60">1 hour</button><button type="button" data-v="480">Today</button><button type="button" data-v="0">Resume</button></span></div>
+        </div>
+        <p class="hint">Cards drop down below the closed island; they wait while your mouse is on them.</p>
       </section>
       <section class="s-mbsec" hidden>
         <h3>Menu bar</h3>
         <div class="grp">
           <button type="button" class="row s-menubar" role="switch" aria-checked="false"><span>Menu bar mode</span><i class="tg"></i></button>
           <div class="row stack s-mbscreen" hidden><span>Screen</span><span class="segs s-screens" role="group" aria-label="Which screen"></span></div>
-          <div class="row s-mbsize" hidden><span>Size</span><input type="range" class="s-msize" min="70" max="150" step="5" aria-label="Size of the island in the menu bar"><output class="s-msizev">100%</output></div>
-          <div class="row s-mbgap" hidden><span>Notch gap</span><input type="range" class="s-ngap" min="120" max="320" step="2" aria-label="Room left for the notch"><output class="s-ngapv">210</output></div>
+          <button type="button" class="row s-mbedit" role="switch" aria-checked="false" hidden><span>Adjust size (drag the island)</span><i class="tg"></i></button>
         </div>
         <p class="hint">The island hangs from the notch at the top of your screen, and the song playing is written in the menu bar. Click Astrum's menu bar icon to open it.</p>
       </section>
@@ -486,6 +519,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
 </div>
 <div class="aura" aria-hidden="true"></div>
 <div class="cards" aria-live="polite"></div>
+<div class="mbdone"><span>Drag the sides for the notch, the bottom for the size</span><button type="button" class="mbreset">Reset</button><button type="button" class="mbok">Done</button></div>
 <script src="desktop.js"></script>
 <script>window.NP_SETUP_URL = location.origin + '/guide/spotify.html'; window.YT_SETUP_URL = 'http://localhost:' + location.port + '/guide/youtube.html';</script>
 <script src="ytmusic.js"></script>
@@ -591,9 +625,13 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   }
   var measure = document.createElement('canvas').getContext('2d');
   function pillWidth() {
-    if (ov && ov.notch) {   // the menu bar: the icon and the name left of the notch, the bars (and the badge) right of it
-      var k = msK(), nl = notchLeft(nameW());
-      return Math.round(nl + notchW() + ($('.eq').offsetParent ? (9 + 18) * k : 0) + ($('.badge').hidden ? 0 : (9 + 18) * k) + 16 * k);
+    if (ov && ov.notch) {
+      /* the menu bar: the icon and the name left of the notch, the bars (and the badge) right of it. Both sides are as wide as
+         the wider of them, so the island is centred on the notch; the name gets the left side's spare room as its width */
+      var k = msK(), left = notchLeft(nameW()), right = ($('.eq').offsetParent ? (9 + 18) * k : 0) + ($('.badge').hidden ? 0 : (9 + 18) * k) + 16 * k;
+      var side = Math.ceil(Math.max(left, right));
+      $('.pt').style.setProperty('--ptw', Math.max(0, side - (14 + 20 + 9 + 9) * k).toFixed(1) + 'px');
+      return side * 2 + notchW();
     }
     measure.font = '600 12.5px "Chakra Petch", "Segoe UI", system-ui, sans-serif';
     var w = measure.measureText($('.ptx').dataset.text || '').width;
@@ -799,9 +837,6 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   function placeVars(w, h) {
     var st = document.documentElement.style;
     var left = Math.round(Math.max(ov.left + 6, Math.min(ov.right - w - 6, ov.cx - w / 2)));   // whole on its screen, near a side too
-    if (ov.notch && level === 0 && notchW()) {   // closed on a notch: placed so the gap between the name and the bars sits under it
-      left = Math.round(ov.cx - notchW() / 2 - notchLeft(nameW()));
-    }
     var top = ov.up ? Math.round(winH() - ov.bottom - h) : ov.top;                         // grows away from the edge it sits on
     st.setProperty('--ix', left + 'px'); st.setProperty('--iy', top + 'px');
   }
@@ -904,7 +939,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   function hoverIn() {
     clearTimeout(leaveT);
     clearTimeout(hoverT);
-    if (level !== 0 || moving || Date.now() - dropped < 900) return;   // just let go of a drag: not a hover
+    if (level !== 0 || moving || editing || Date.now() - dropped < 900) return;   // just let go of a drag: not a hover
     hoverT = setTimeout(function () {
       if (level !== 0 || moving || Date.now() - dropped < 900 || !isl.matches(':hover') || pillGrip.matches(':hover')) return;
       hoverOpened = true; sticky = false; go(1);
@@ -957,6 +992,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     if (p && p.overlay) {   // moved (or first placed): straight to the new spot, no slide inside the window
       ov = p; body.classList.add('ov', 'noanim'); body.classList.remove('up');
       body.classList.toggle('notch', !!p.notch); body.classList.toggle('ovup', !!p.up); document.documentElement.style.setProperty('--bar', (p.bar || 24) + 'px');
+      body.classList.toggle('notched', notched());
       notchVars(); if (D && D.settings.get && paintPosition.ready) D.settings.get().then(paintPosition);
       size();
       requestAnimationFrame(function () { requestAnimationFrame(function () { body.classList.remove('noanim'); }); });
@@ -986,7 +1022,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     // in Menu bar mode it is always on top and lives on a notch: only the screen is chosen
     $('.s-where').hidden = nb; $('.s-top').hidden = nb;
     $('.s-mbscreen').hidden = !nb || !(st.screens && st.screens.length > 1);
-    $('.s-mbsize').hidden = !nb; $('.s-mbgap').hidden = !nb || !notched();   // the gap only matters on a screen with a notch
+    $('.s-mbedit').hidden = !nb; if (!nb && editing) setEditing(false);
     var ss = $('.s-screens'); ss.textContent = '';
     (st.screens || []).forEach(function (d) {
       var b = el('button', null, d.name); b.type = 'button'; b.title = d.size + (d.primary ? ' · main screen' : '');
@@ -1004,14 +1040,33 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     $$('.s-key button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === (st.shortcut || ''))); });
     $('.s-keynote').textContent = st.shortcut && st.shortcutOk === false ? 'Another app already uses this shortcut: pick another.' : st.shortcut ? 'Press it anywhere to open Astrum; again to close it.' : '';
   }
-  // Size and Notch gap (kept with the look, in this computer)
-  function rangeOf(cls, key, unit) {
-    var r = $('.' + cls), o = $('.' + cls + 'v');
-    function show() { var v = Astrum.theme.get()[key]; r.value = v; o.textContent = v + unit; r.style.setProperty('--v', ((v - r.min) / (r.max - r.min) * 100).toFixed(1)); }
-    r.addEventListener('input', function () { var p = {}; p[key] = +r.value; Astrum.theme.set(p); });
-    Astrum.theme.onChange(show); show();
+  /* Menu bar mode › Adjust size: switched on, the island closes and shows handles; its sides set the room left for the notch,
+     its bottom its size; Done (or the switch, or Esc) keeps it so */
+  var editing = false, rz = null;
+  function setEditing(on) {
+    editing = !!on; body.classList.toggle('mbedit', editing);
+    $('.s-mbedit').setAttribute('aria-checked', String(editing));
+    if (editing) { sticky = false; panel = null; go(0); }
   }
-  rangeOf('s-msize', 'msize', '%'); rangeOf('s-ngap', 'ngap', ' px');
+  $('.s-mbedit').addEventListener('click', function () { setEditing(!editing); });
+  document.querySelector('.mbok').addEventListener('click', function () { setEditing(false); });
+  document.querySelector('.mbreset').addEventListener('click', function () { Astrum.theme.set({ msize: 100, ngap: 210 }); });
+  $$('.rh').forEach(function (h) {
+    h.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0 || !editing) return;
+      e.preventDefault(); e.stopPropagation(); h.setPointerCapture(e.pointerId);
+      var T = Astrum.theme.get(); rz = { side: h.classList.contains('rh-b') ? 'b' : h.classList.contains('rh-l') ? 'l' : 'r', x: e.clientX, y: e.clientY, ms: T.msize, gap: T.ngap };
+      body.classList.add('noanim');
+    });
+    h.addEventListener('pointermove', function (e) {
+      if (!rz) return;
+      if (rz.side === 'b') Astrum.theme.set({ msize: Math.max(70, Math.min(150, Math.round(rz.ms + (e.clientY - rz.y) / 32 * 100))) });
+      else { var dx = (rz.side === 'l' ? rz.x - e.clientX : e.clientX - rz.x); Astrum.theme.set({ ngap: Math.max(120, Math.min(320, Math.round(rz.gap + dx * 2))) }); }
+    });
+    function end() { if (!rz) return; rz = null; body.classList.remove('noanim'); }
+    h.addEventListener('pointerup', end); h.addEventListener('lostpointercapture', end);
+    h.addEventListener('click', function (e) { e.stopPropagation(); });
+  });
   if (D && D.settings.set) {
     $$('.s-place button').forEach(function (b) { b.addEventListener('click', function () { D.settings.set({ placement: b.dataset.v }).then(paintPosition); }); });
     $('.s-top').addEventListener('click', function () { D.settings.set({ alwaysOnTop: this.getAttribute('aria-checked') !== 'true' }).then(paintPosition); });
@@ -1019,7 +1074,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     $('.s-menubar').addEventListener('click', function () { D.settings.set({ placement: this.getAttribute('aria-checked') === 'true' ? 'screen' : 'notch' }).then(paintPosition); });
     D.settings.get().then(paintPosition); D.settings.onChange(paintPosition);
   }
-  $('.pill').addEventListener('click', function () { clearTimeout(hoverT); sticky = true; hoverOpened = false; if (D) D.island.focus(); go(1); });
+  $('.pill').addEventListener('click', function () { if (editing) return; clearTimeout(hoverT); sticky = true; hoverOpened = false; if (D) D.island.focus(); go(1); });
   $$('.tabs button').forEach(function (b) {
     b.addEventListener('click', function () { sticky = true; tab = b.dataset.t; panel = null; if (level === 3) { go(2); } render(); });
   });
@@ -1034,7 +1089,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   $('.h-up').addEventListener('click', function () { sticky = false; go(0); });
   // drag: away from the edge it sits on for more (down, or up when at the bottom), back for less (the pill, the head, the grab bar)
   var dragY = null;
-  function dragStart(e) { if (e.button !== 0 || e.target.closest('button') && !e.target.closest('.pill')) return; dragY = e.clientY; }
+  function dragStart(e) { if (editing || e.button !== 0 || e.target.closest('button') && !e.target.closest('.pill')) return; dragY = e.clientY; }
   [$('.pill'), $('.head'), $('.grab')].forEach(function (n) { n.addEventListener('pointerdown', dragStart); });
   window.addEventListener('pointermove', function (e) {
     if (dragY == null) return; var dy = (up ? -1 : 1) * (e.clientY - dragY);   // at the bottom of a screen, up opens it
@@ -1043,8 +1098,9 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   });
   window.addEventListener('pointerup', function () { dragY = null; });
   window.addEventListener('pointercancel', function () { dragY = null; });
-  window.addEventListener('wheel', function (e) { if (level === 0 && e.deltaY > 20) { sticky = true; go(1); } }, { passive: true });
+  window.addEventListener('wheel', function (e) { if (level === 0 && !editing && e.deltaY > 20) { sticky = true; go(1); } }, { passive: true });
   document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && editing) { setEditing(false); return; }
     if (e.key !== 'Escape' || document.querySelector('.np-pick.on') || Date.now() - viewClosed < 100) return;
     if (level === 3 && tab === 'dc') go(2); else if (level > 0 && level < 3) go(level - 1);
   });
@@ -1054,7 +1110,8 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
 
   /* ---------- the drop-down cards: a song that started, a Discord message (closed island, overlay only) ---------- */
   var cards = document.querySelector('.cards'), cardT = 0, cardEl = null, songKey = null, msgTs = null;
-  function cardsOn() { return Astrum.theme.get().cards !== false && !!ov && !ov.drag; }
+  function cardsOn() { var T = Astrum.theme.get(); return T.cards !== false && !(T.snooze > Date.now()) && !editing && !!ov && !ov.drag; }
+  function cardMs() { return (Astrum.theme.get().cardSecs || 7) * 1000; }
   function hideCard() {
     clearTimeout(cardT); var c = cardEl; cardEl = null; if (!c) return;
     c.classList.remove('on'); setTimeout(function () { c.remove(); }, 400);
@@ -1092,20 +1149,52 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     if (src === 'sp' && !api.liked()) acts.push({ label: 'Like', fn: function () { api.like(); } });
     acts.push({ label: 'Skip', fn: function () { api.control(src, 'next'); } });
     acts.push({ label: 'Open', pri: true, fn: function () { tab = src; sticky = true; go(1); } });
-    showCard({ kicker: 'Now playing · ' + (src === 'yt' ? 'YouTube' : 'Spotify'), title: t.title, text: t.artist || '', img: t.art, icon: IC[src], actions: acts, ms: 6000 });
+    if (Astrum.theme.get().cardSong === false) return;
+    showCard({ kicker: 'Now playing · ' + (src === 'yt' ? 'YouTube' : 'Spotify'), title: t.title, text: t.artist || '', img: t.art, icon: IC[src], actions: acts, ms: cardMs() });
   }
   function msgCard() {
     var ms = feed.messages || [], top = ms.length ? ms[0].ts : 0;
     if (!msgTs) { msgTs = top || null; return; }   // the messages there already (or the first ones the bot brings in): no card
     if (!top || top <= msgTs) return;
     var fresh = ms.filter(function (m) { return m.ts > msgTs && Date.now() - m.ts < 120000; }); msgTs = top;   // only ones just sent
-    var m = fresh[0]; if (!m) return;
-    body.classList.add('ping'); clearTimeout(msgCard.t); msgCard.t = setTimeout(function () { body.classList.remove('ping'); }, 3400);
+    var T = Astrum.theme.get(), muted = T.cardMute || [];
+    fresh = fresh.filter(function (x) { return muted.indexOf(x.channel) < 0; });   // channels switched off in Notifications
+    var m = fresh[0]; if (!m || T.snooze > Date.now()) return;
+    if (T.cardPing !== false) body.classList.add('ping'); clearTimeout(msgCard.t); msgCard.t = setTimeout(function () { body.classList.remove('ping'); }, 3400);
+    if (T.cardMsg === false) return;
     showCard({ kind: 'dc', kicker: '#' + m.channelName + (fresh.length > 1 ? ' · ' + fresh.length + ' new' : ''), title: m.author.name, text: m.content || '(an attachment)',
-      img: m.author.avatar, round: true, icon: IC.dc, ms: 8000, actions: [
+      img: m.author.avatar, round: true, icon: IC.dc, ms: cardMs() + 1000, actions: [
         { label: 'Show all', fn: function () { tab = 'dc'; sticky = true; go(2); } },
         { label: 'Reply', pri: true, fn: function () { window.open(m.url, '_blank'); } }] });
   }
+
+  /* Settings › Notifications */
+  function paintNotif() {
+    var T = Astrum.theme.get(), grp = $('.s-cards').parentNode;
+    grp.classList.toggle('n-off', T.cards === false);
+    $$('.s-csecs button').forEach(function (b) { b.setAttribute('aria-pressed', String(+b.dataset.v === T.cardSecs)); });
+    var snoozed = T.snooze > Date.now();
+    $('.s-snoozet').textContent = snoozed ? 'Paused until ' + new Date(T.snooze).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pause notifications';
+    $('.s-snooze [data-v="0"]').hidden = !snoozed;
+    var chans = feed.channels || [], box = $('.s-chans'); box.textContent = '';
+    $('.s-cchans').hidden = chans.length < 2;
+    chans.forEach(function (c) {
+      var b = el('button', null, '#' + c.name); b.type = 'button'; b.setAttribute('aria-pressed', String((T.cardMute || []).indexOf(c.id) < 0));
+      b.addEventListener('click', function () {
+        var m = (Astrum.theme.get().cardMute || []).slice(), i = m.indexOf(c.id);
+        if (i < 0) m.push(c.id); else m.splice(i, 1);
+        Astrum.theme.set({ cardMute: m });
+      });
+      box.appendChild(b);
+    });
+  }
+  $$('.s-csecs button').forEach(function (b) { b.addEventListener('click', function () { Astrum.theme.set({ cardSecs: +b.dataset.v }); }); });
+  $$('.s-snooze button').forEach(function (b) { b.addEventListener('click', function () {
+    var min = +b.dataset.v, until = 0;
+    if (min === 480) { var d = new Date(); d.setHours(23, 59, 0, 0); until = d.getTime(); } else if (min) until = Date.now() + min * 60000;
+    Astrum.theme.set({ snooze: until }); if (until) hideCard();
+  }); });
+  Astrum.theme.onChange(paintNotif);
 
   /* ---------- Settings › Controls: the computer's own sound, brightness, dark mode, Wi-Fi, Bluetooth (main.js, lib/system.js) ---------- */
   var sys = {}, sysT = 0, sysBusy = {}, ctrl = null;
