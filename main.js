@@ -190,8 +190,11 @@ function createIsland() {
 
 /* macOS › the menu bar: what plays is written beside Astrum's icon there; clicking it calls the island (down from the
    notch, In the menu bar), and the right button gives the menu */
+let lastTrack = null;
 function trayTitle(t) {
+  if (t !== undefined) lastTrack = t; else t = lastTrack;
   if (!tray || !MAC) return;
+  if (store.settings().placement !== 'notch') t = null;   // Menu bar mode is one switch: off, the menu bar shows only the icon
   const clip = (v, n) => { v = String(v || '').replace(/\s+/g, ' ').trim(); return v.length > n ? v.slice(0, n - 1) + '…' : v; };
   const text = t && t.playing && t.title ? clip(t.title, 26) + (t.artist ? ' – ' + clip(t.artist, 18) : '') : '';
   tray.setTitle(text ? ' ' + text : '', { fontType: 'monospacedDigit' });
@@ -204,7 +207,7 @@ function buildTray() {
   const menu = () => Menu.buildFromTemplate([
     { label: 'Show the island', click: () => { if (!island) createIsland(); else island.showInactive(); } },
     { label: 'Hide the island', click: () => island && island.hide() },
-    ...(NOTCH_OK ? [{ label: 'In the menu bar (over the notch)', type: 'checkbox', checked: store.settings().placement === 'notch',
+    ...(NOTCH_OK ? [{ label: 'Menu bar mode', type: 'checkbox', checked: store.settings().placement === 'notch',
       click: (m) => { applySettings({ placement: m.checked ? 'notch' : 'screen' }); } }] : []),
     { type: 'separator' },
     { label: 'Set up (opens in your browser)…', click: () => openGuide('index') },
@@ -237,7 +240,7 @@ function applySettings(patch) {
   if (patch.placement === 'screen' && before.placement !== 'screen') pinToScreen();
   if (patch.placement === 'notch' && before.placement !== 'notch') { anchor = place.notchAt(anchorDisplay()); store.setSettings({ bounds: anchor }); placeIsland(); }
   if (patch.placement && patch.placement !== 'notch' && before.placement === 'notch') pinToScreen();   // down from the menu bar, to the top middle
-  if ('placement' in patch) applyOnTop();
+  if ('placement' in patch) { applyOnTop(); trayTitle(); if (tray) tray.refresh(); }
   sendAll('settings', publicSettings());
   return now;
 }

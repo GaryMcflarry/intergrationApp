@@ -1692,6 +1692,7 @@ window.NowPlaying = (function () {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { $('.np-t').classList.remove('mq'); fitTitle(); });
 
     ready.then(function () { setStatus(tok ? 'idle' : 'off'); poll(); });
+    var volT = 0;
     return {
       enabled: function () { return enabled; },
       setEnabled: function (on) { enabled = on; try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) { } if (!on) { hide(); setHere(false); } poll(); },
@@ -1715,6 +1716,31 @@ window.NowPlaying = (function () {
         var b = $('.np-' + (what === 'play' ? 'play' : what)); if (b) b.click();
       },
       like: function () { $('.np-like').click(); }, liked: function () { return !!liked; },
+      /* the island's type bar and tiles */
+      // songs for some words (one search; while Spotify's search rests it says so)
+      find: function (q) {
+        q = String(q || '').trim(); if (q.length < 2) return Promise.resolve([]);
+        var rest = searchResting(); if (rest) return Promise.reject(new Error(retryMessage(rest, true, searchLimit)));
+        return call('GET', '/search?type=track&limit=5&q=' + encodeURIComponent(q)).then(function (j) {
+          return (j && j.tracks && j.tracks.items || []).filter(Boolean).map(function (t) {
+            var im = t.album && t.album.images || [];
+            return { uri: t.uri, title: t.name, artist: (t.artists || []).map(function (a) { return a.name; }).join(', '), art: (im[im.length - 1] || im[0] || {}).url || '' };
+          });
+        }, function (e) { throw new Error(why(e)); });
+      },
+      playTrack: function (uri, label) { return /^spotify:track:[A-Za-z0-9]+$/.test(uri || '') ? play({ uris: [uri] }, label || 'your pick') : Promise.resolve(false); },
+      djPlay: function (q) { q = String(q || '').trim().toLowerCase(); if (q.length < 2) return; setSrc('sp', true); dj.g = q; djEnter(true); },
+      ytSearch: function (q) { if (yt && yt.search) { setSrc('yt', true); yt.search(q); } },
+      volume: function (s2, v) {
+        if (s2 === 'yt') return yt && yt.volume ? yt.volume(v) : null;
+        if (v == null) return S && S.device && S.device.volume_percent != null ? S.device.volume_percent : null;
+        v = Math.max(0, Math.min(100, Math.round(+v)));
+        if (S && S.device) S.device.volume_percent = v;
+        var r = $('.np-volr'); if (r) r.value = v;
+        clearTimeout(volT); volT = setTimeout(function () { ctl('PUT', '/me/player/volume?volume_percent=' + v, function () { }); }, 250);
+        return v;
+      },
+      device: function () { return S && S.device ? S.device.name : ''; },
       signedIn: function () { return !!(load() && load().refresh); },
       spotifyTrack: function () { return currentTrack(); },
       ytTrack: function () { return yt ? yt.track() : null; },

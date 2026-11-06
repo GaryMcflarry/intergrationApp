@@ -11,7 +11,7 @@
   /* ---------- the theme ---------- */
   var PRESETS = ['#7C4DFF', '#3B82F6', '#2DD4BF', '#A3E635', '#F59E0B', '#FF6B3D', '#F43F5E', '#EC4899', '#A855F7', '#7DD3FC', '#22C55E', '#94A3B8'];
   var SOURCE = { sp: '#1ED760', yt: '#FF4E45', dc: '#5865F2' };
-  var KEY = 'astrum-theme-v1', DEF = { accent: '#1ED760', glow: 25, fullOpacity: 70, follow: true, cycle: false, every: 8, aura: false, sky: false, intro: false, glass: true, clarity: 50, v: 2 };
+  var KEY = 'astrum-theme-v1', DEF = { accent: '#1ED760', glow: 25, fullOpacity: 70, follow: true, cycle: false, every: 8, aura: false, sky: false, intro: false, glass: true, clarity: 50, cards: true, v: 2 };
   var T = load(), src = null, cycleT = 0, subs = [];
 
   function load() {
@@ -120,7 +120,7 @@
   }
 
   /* ---------- the settings panel ---------- */
-  var TOGGLES = [['.s-follow', 'follow'], ['.s-cycle', 'cycle'], ['.s-aura', 'aura'], ['.s-sky', 'sky'], ['.s-intro', 'intro'], ['.s-glass', 'glass']];
+  var TOGGLES = [['.s-follow', 'follow'], ['.s-cycle', 'cycle'], ['.s-aura', 'aura'], ['.s-sky', 'sky'], ['.s-intro', 'intro'], ['.s-glass', 'glass'], ['.s-cards', 'cards']];
   function mountSettings(p) {
     function q(c) { return p.querySelector(c); }
     var sw = q('.sw');
