@@ -4,9 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Astrum</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="fonts/fonts.css">
 <style>
 /* Astrum: a compact black island at the top of the screen that grows in four steps.
    0 pill (what plays, or Discord) · 1 peek (three tabs and what plays) · 2 expanded (the full player, Discord's
@@ -579,6 +577,8 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
 
   /* ---------- state ---------- */
   var level = 0, tab = 'sp', sticky = false, panel = null;
+  try { var keptTab = localStorage.getItem('ia-tab'); if (keptTab === 'sp' || keptTab === 'yt' || keptTab === 'dc') tab = keptTab; } catch (e) { }   // the tab you had open last
+  function setTab(t) { tab = t; try { localStorage.setItem('ia-tab', t); } catch (e) { } }
   var music = { spotify: null, youtube: null }, lead = null, feed = { configured: false, messages: [], channels: [] }, dcStatus = { text: '', ok: false }, dcChan = 'all';
   var settings = {};
   var seen = 0; try { seen = +localStorage.getItem('ia-dc-seen') || 0; } catch (e) { }
@@ -1083,7 +1083,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   }
   $('.pill').addEventListener('click', function () { if (editing) return; clearTimeout(hoverT); sticky = true; hoverOpened = false; if (D) D.island.focus(); go(1); });
   $$('.tabs button').forEach(function (b) {
-    b.addEventListener('click', function () { sticky = true; tab = b.dataset.t; panel = null; if (level === 3) { go(2); } render(); });
+    b.addEventListener('click', function () { sticky = true; setTab(b.dataset.t); panel = null; if (level === 3) { go(2); } render(); });
   });
   $('.h-set').addEventListener('click', function () {
     sticky = true;
@@ -1106,6 +1106,28 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   window.addEventListener('pointerup', function () { dragY = null; });
   window.addEventListener('pointercancel', function () { dragY = null; });
   window.addEventListener('wheel', function (e) { if (level === 0 && !editing && e.deltaY > 20) { sticky = true; go(1); } }, { passive: true });
+  /* quick controls: keys while the island has the keyboard, the closed pill's bars, a middle click on it, the tray menu */
+  function musicSrc() { return tab === 'yt' ? 'yt' : tab === 'sp' ? 'sp' : (lead === 'youtube' ? 'yt' : 'sp'); }   // on the Discord tab: what plays
+  function media(what) {
+    var src = level === 0 ? (lead === 'youtube' ? 'yt' : 'sp') : musicSrc();
+    if (what === 'like') { if (src === 'sp') api.like(); } else api.control(src, what);
+    if (level === 1) setTimeout(paintPeek, 350);
+  }
+  if (D && D.island.onMedia) D.island.onMedia(function (w) { if (w === 'play' || w === 'next' || w === 'prev') media(w); });
+  $('.eq').title = 'Play / pause';
+  $('.eq').addEventListener('click', function (e) { if (level !== 0 || editing || !isl.classList.contains('playing') && !shown()) return; e.stopPropagation(); media('play'); });
+  $('.pill').addEventListener('auxclick', function (e) { if (e.button === 1 && !editing) { e.preventDefault(); media('play'); } });
+  function typing(t) { return !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)); }   // a field or a slider keeps its keys
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || level === 3 || editing) return;
+    var k = e.key;
+    if (k === ' ' && !(e.target && e.target.closest && e.target.closest('button'))) { e.preventDefault(); media('play'); }
+    else if (k === 'ArrowRight') { e.preventDefault(); media('next'); }
+    else if (k === 'ArrowLeft') { e.preventDefault(); media('prev'); }
+    else if (k === 'l' || k === 'L') media('like');
+    else if (k === '1' || k === '2' || k === '3') { sticky = true; setTab(['sp', 'yt', 'dc'][+k - 1]); panel = null; if (level === 0) go(1); else render(); }
+    else if (k === '/') { e.preventDefault(); sticky = true; if (level !== 1) go(1); setTimeout(function () { askIn.focus(); }, 60); }
+  });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && editing) { setEditing(false); return; }
     if (e.key !== 'Escape' || document.querySelector('.np-pick.on') || Date.now() - viewClosed < 100) return;
@@ -1155,7 +1177,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     var src = t.source === 'youtube' ? 'yt' : 'sp', acts = [];
     if (src === 'sp' && !api.liked()) acts.push({ label: 'Like', fn: function () { api.like(); } });
     acts.push({ label: 'Skip', fn: function () { api.control(src, 'next'); } });
-    acts.push({ label: 'Open', pri: true, fn: function () { tab = src; sticky = true; go(1); } });
+    acts.push({ label: 'Open', pri: true, fn: function () { setTab(src); sticky = true; go(1); } });
     if (Astrum.theme.get().cardSong === false) return;
     showCard({ kicker: 'Now playing · ' + (src === 'yt' ? 'YouTube' : 'Spotify'), title: t.title, text: t.artist || '', img: t.art, icon: IC[src], actions: acts, ms: cardMs() });
   }
@@ -1171,7 +1193,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     if (T.cardMsg === false) return;
     showCard({ kind: 'dc', kicker: '#' + m.channelName + (fresh.length > 1 ? ' · ' + fresh.length + ' new' : ''), title: m.author.name, text: m.content || '(an attachment)',
       img: m.author.avatar, round: true, icon: IC.dc, ms: cardMs() + 1000, actions: [
-        { label: 'Show all', fn: function () { tab = 'dc'; sticky = true; go(2); } },
+        { label: 'Show all', fn: function () { setTab('dc'); sticky = true; go(2); } },
         { label: 'Reply', pri: true, fn: function () { window.open(m.url, '_blank'); } }] });
   }
 

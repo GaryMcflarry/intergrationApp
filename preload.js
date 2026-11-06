@@ -5,7 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 const on = {};
 function listen(channel) { on[channel] = []; ipcRenderer.on(channel, (_e, d) => on[channel].forEach((f) => f(d))); return (f) => { on[channel].push(f); }; }
 const onKv = listen('kv-changed'), onSettings = listen('settings'), onStatus = listen('discord-status'), onFeed = listen('discord-feed');
-const onReflow = listen('island-reflow'), onPoke = listen('island-poke'), onPlace = listen('island-place'), onSummon = listen('island-summon');
+const onReflow = listen('island-reflow'), onPoke = listen('island-poke'), onPlace = listen('island-place'), onSummon = listen('island-summon'), onMedia = listen('island-media');
 
 contextBridge.exposeInMainWorld('desktop', {
   isApp: true,
@@ -25,7 +25,7 @@ contextBridge.exposeInMainWorld('desktop', {
     full: (on2) => ipcRenderer.invoke('island-full', !!on2),
     focus: () => ipcRenderer.send('island', 'focus'),
     blur: () => ipcRenderer.send('island', 'blur'),
-    onReflow, onPoke, onPlace, onSummon
+    onReflow, onPoke, onPlace, onSummon, onMedia
   },
   // Settings › Controls: the computer's own sound, brightness, dark mode, Wi-Fi, Bluetooth, and lock / screenshot / Focus
   system: {

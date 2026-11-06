@@ -192,12 +192,18 @@ function createIsland() {
 
 /* the tray: on a Mac, a plain white star in the menu bar (a template image, lib/trayicon.js) that just sits there; clicking
    it calls the island, and the right button gives the menu. Elsewhere, the app's icon. */
+function media(what) { if (island) island.webContents.send('island-media', what); }
 function buildTray() {
   tray = new Tray(MAC ? require('./lib/trayicon').menuBarIcon(nativeImage) : nativeImage.createFromDataURL(ICON));
   tray.setToolTip('Astrum');
   const menu = () => Menu.buildFromTemplate([
     { label: 'Show the island', click: () => { if (!island) createIsland(); else island.showInactive(); } },
     { label: 'Hide the island', click: () => island && island.hide() },
+    { type: 'separator' },
+    // what plays, without opening the island
+    { label: 'Play / Pause', click: () => media('play') },
+    { label: 'Next', click: () => media('next') },
+    { label: 'Previous', click: () => media('prev') },
     ...(NOTCH_OK ? [{ label: MAC ? 'Menu bar mode' : 'Top bar mode', type: 'checkbox', checked: store.settings().placement === 'notch',
       click: (m) => { applySettings({ placement: m.checked ? 'notch' : 'screen' }); } }] : []),
     { type: 'separator' },
