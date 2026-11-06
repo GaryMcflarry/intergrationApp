@@ -519,11 +519,13 @@ window.NowPlaying = (function () {
     // Each page asks Spotify what is playing; the answer is shared through this browser's storage, so another page that
     // asked a moment ago (and after our last button press) saves this one a request: three open pages cost about one.
     var lastAction = 0, polling = false, panelActive = false, lagged = false, lastRaw = null;
-    // how long until Spotify is asked again: often while the player is open, rarely while it is closed, and always just after
-    // the song should end, so the next one shows straight away (a skip from another device shows within 10 s)
+    // how long until Spotify is asked again: every few seconds (so a pause or skip from the keyboard, the Spotify app or a
+    // phone shows within 5 s, open or closed), more often with the full player open, and always just after the song should
+    // end, so the next one shows straight away. Nothing on Spotify at all: every 15 s.
     function gap() {
       if (!tok) return 10000;
-      var playing = S && S.is_playing, g = !panelActive ? (playing ? 10000 : 30000) : playing ? (box.classList.contains('big') || djOpen ? 5000 : 8000) : (S && S.item ? 6000 : 12000);
+      var playing = S && S.is_playing, big = panelActive && (box.classList.contains('big') || djOpen);
+      var g = !(S && S.item) ? 15000 : big ? 3000 : panelActive ? 4000 : 5000;
       if (playing && S.item && S.item.duration_ms) { var left = S.item.duration_ms - S.progress_ms - (Date.now() - at); if (left > 0) g = Math.min(g, left + 700); }
       return Math.max(1200, g);
     }
@@ -531,7 +533,9 @@ window.NowPlaying = (function () {
       if (polling) return;
       clearTimeout(timer);
       tok = load() || tok;
-      if (!enabled || !tok || document.hidden) {
+      // the island is always on screen: it keeps asking even when the system calls its window hidden (a see-through window
+      // nothing covers can count as "occluded" on macOS and Windows, which stopped it until the mouse came by)
+      if (!enabled || !tok || (document.hidden && !opts.app)) {
         if (!enabled || !tok) hide();
         if (enabled && !tok) setIdle('connect');   // signed out: a card to connect
         timer = setTimeout(poll, 4000); return;

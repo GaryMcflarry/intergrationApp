@@ -23,6 +23,11 @@ app.setPath('userData', path.join(app.getPath('appData'), 'integrationApp'));
 // Google refuses sign-in inside apps that say they are Electron: present as the Chrome it is built on
 app.userAgentFallback = app.userAgentFallback.replace(/\s?Electron\/\S+/, '').replace(/\s?(integrationApp|Astrum)\/\S+/i, '');
 if (!app.requestSingleInstanceLock()) app.quit();
+// the island is a see-through window that is always on screen: Chromium must not treat it as hidden ("occluded") or put it
+// to sleep in the background, or what plays stops updating until the mouse passes over it
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 const MAC = process.platform === 'darwin';
 // Menu bar mode (Top bar mode on Windows): the island flush at the very top of a screen (ASTRUM_NOTCH=1 tries it on Linux)
