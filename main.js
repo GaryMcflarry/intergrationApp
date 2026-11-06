@@ -12,6 +12,7 @@ const { createBot } = require('./lib/discordbot');
 const { createSpotifyAuth } = require('./lib/spotify-auth');
 const { createApi } = require('./lib/api');
 const ICON = require('./lib/icon');
+const systemControls = require('./lib/system');
 
 const ORIGIN = `http://127.0.0.1:${server.PORT}`;     // the island, the guides, Spotify's return address
 const GOOGLE = `http://localhost:${server.PORT}`;     // the YouTube guide (Google signs in here)
@@ -132,7 +133,7 @@ let drag = null;
 function stopDrag() { if (drag) { clearInterval(drag.timer); drag = null; } }
 const DRAG_PAD = 28;   // room around the island while it is carried (its shadow and glow)
 function dragIsland(phase, box) {
-  if (phase === 'start' && !full && !drag) {
+  if (phase === 'start' && !full && !drag && store.settings().placement !== 'notch') {   // Menu bar mode stays on the notch
     const c = screen.getCursorScreenPoint();
     let b = island.getBounds();
     /* the overlay is a big window: carrying all of it is slow (and macOS stops a tall window at the top of the screen),
@@ -244,7 +245,12 @@ function applySettings(patch) {
   sendAll('settings', publicSettings());
   return now;
 }
-function publicSettings() { const s = store.settings(); return { alwaysOnTop: s.alwaysOnTop, placement: s.placement, shortcut: s.shortcut, shortcutOk, mac: MAC, notchOk: NOTCH_OK, openAtLogin: s.openAtLogin, discordId: !!s.discordId, presence: s.presence, webhook: !!s.webhook, bot: !!s.botToken, channels: s.channels }; }
+// the screens, for Menu bar mode's screen picker (which one the island hangs from)
+function screensInfo() {
+  const prim = screen.getPrimaryDisplay().id;
+  return screen.getAllDisplays().map((d, i) => ({ id: d.id, name: d.label || (d.id === prim ? 'Main screen' : 'Screen ' + (i + 1)), size: d.size.width + '×' + d.size.height, primary: d.id === prim }));
+}
+function publicSettings() { const s = store.settings(); return { screens: screensInfo(), screen: anchorDisplay().id, alwaysOnTop: s.alwaysOnTop, placement: s.placement, shortcut: s.shortcut, shortcutOk, mac: MAC, notchOk: NOTCH_OK, openAtLogin: s.openAtLogin, discordId: !!s.discordId, presence: s.presence, webhook: !!s.webhook, bot: !!s.botToken, channels: s.channels }; }
 function setKv(key, value) { if (store.set(key, value)) sendAll('kv-changed', { key, value: value == null ? null : String(value) }); }
 
 /* ---------- what the island may ask ---------- */
@@ -256,6 +262,13 @@ function wire() {
     for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed() && w.webContents !== e.sender) w.webContents.send('kv-changed', { key: String(key), value: value == null ? null : String(value) });
   });
   ipcMain.handle('settings-get', (e) => (fromApp(e) ? publicSettings() : null));
+  /* Settings › Controls: the computer's own sound, brightness, dark mode, Wi-Fi, Bluetooth (lib/system.js: fixed commands,
+     known controls and values only), asked only by the island's own page */
+  const sys = systemControls.create({ open: (u) => shell.openExternal(u), dataDir: app.getPath('userData') });
+  const fromIsland = (e) => { try { return new URL(e.senderFrame.url).origin === ORIGIN && island && BrowserWindow.fromWebContents(e.sender) === island; } catch { return false; } };
+  ipcMain.handle('system-get', (e) => (fromIsland(e) ? sys.get() : null));
+  ipcMain.handle('system-set', (e, k, v) => (fromIsland(e) ? sys.set(String(k), v) : { ok: false }));
+  ipcMain.handle('system-act', (e, a) => (fromIsland(e) ? sys.act(String(a)) : { ok: false }));
   ipcMain.handle('settings-set', (e, patch) => {   // the island's own settings: where it stays, on top or not, the shortcut, starting with the computer
     if (!fromApp(e) || !patch || typeof patch !== 'object') return null;
     const clean = {};
@@ -263,6 +276,11 @@ function wire() {
     if ('alwaysOnTop' in patch) clean.alwaysOnTop = !!patch.alwaysOnTop;
     if (typeof patch.shortcut === 'string' && SHORTCUTS.has(patch.shortcut)) clean.shortcut = patch.shortcut;
     if ('openAtLogin' in patch) clean.openAtLogin = !!patch.openAtLogin;
+    // Menu bar mode: which screen's notch (it cannot be dragged there)
+    if (Number.isFinite(patch.notchScreen) && store.settings().placement === 'notch') {
+      const d = screen.getAllDisplays().find((x) => x.id === patch.notchScreen);
+      if (d) { anchor = place.notchAt(d); store.setSettings({ bounds: anchor }); placeIsland(); }
+    }
     applySettings(clean);
     return publicSettings();
   });
@@ -326,7 +344,8 @@ app.whenReady().then(async () => {
   }
   wire();
   screen.on('display-metrics-changed', () => { placeIsland(); if (island) island.webContents.send('island-reflow'); });
-  screen.on('display-removed', () => placeIsland());   // its screen is gone: the main screen, until it comes back
+  screen.on('display-removed', () => { placeIsland(); sendAll('settings', publicSettings()); });
+  screen.on('display-added', () => sendAll('settings', publicSettings()));   // its screen is gone: the main screen, until it comes back
   createIsland();
   buildTray();
   registerShortcut();

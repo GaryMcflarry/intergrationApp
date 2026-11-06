@@ -27,6 +27,12 @@ contextBridge.exposeInMainWorld('desktop', {
     blur: () => ipcRenderer.send('island', 'blur'),
     onReflow, onPoke, onPlace, onSummon
   },
+  // Settings › Controls: the computer's own sound, brightness, dark mode, Wi-Fi, Bluetooth, and lock / screenshot / Focus
+  system: {
+    get: () => ipcRenderer.invoke('system-get'),
+    set: (key, value) => ipcRenderer.invoke('system-set', String(key), typeof value === 'boolean' ? value : Number(value)),
+    act: (what) => ipcRenderer.invoke('system-act', String(what))
+  },
   openGuide: (what) => ipcRenderer.send('open-guide', String(what || 'index')),
   window: { openSetup: (url) => ipcRenderer.send('open-guide', String(url)) },   // the player's set-up links: their guide, in the browser
   discord: {

@@ -58,6 +58,7 @@ html body.notch #isl[data-l="0"] { height: max(var(--bar, 24px), 32px); backgrou
 html body.notch #isl[data-l="0"]::after, body.notch .aura { display: none; }
 body.notch .pill { height: max(var(--bar, 24px), 32px); padding: 0 16px 0 14px; }
 body.notch .pill .pt, body.notch .pill .idle { visibility: hidden; }
+body.notch .grip, body.notch .pill .eq { display: none; }   /* Menu bar mode: it lives on the notch, so there is nothing to drag */
 /* the notch glow: while music plays, light in the accent (and pink, and cyan) spills from under the notch; a Discord
    message makes it pulse blue */
 .glow { position: absolute; left: 10%; right: 10%; bottom: 0; height: 2px; border-radius: 2px; pointer-events: none; opacity: 0; z-index: 2;
@@ -93,44 +94,37 @@ html body.notch.ping #isl[data-l="0"] .glow { opacity: 1; background-image: line
 .res small { color: var(--ink2); font-size: 11px; }
 .asknote { color: var(--ink2); font-size: 12px; padding: 4px 6px 8px; }
 
-/* 1 · the tiles: what plays, like Control Center */
-.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: 78px 78px 48px; gap: 10px; }
+/* Settings › Controls: the computer's own controls, as Control Center tiles */
+.ctrls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 66px; gap: 10px; }
 .tile { position: relative; min-width: 0; border-radius: 20px; overflow: hidden; color: var(--ink); text-align: left;
   background: linear-gradient(180deg, rgba(255, 255, 255, .13), rgba(255, 255, 255, .05));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 0 0 1px rgba(255, 255, 255, .08), 0 4px 14px rgba(0, 0, 0, .18);
-  backdrop-filter: blur(20px) saturate(1.5); -webkit-backdrop-filter: blur(20px) saturate(1.5); transition: transform .15s ease, background .2s; }
+  backdrop-filter: blur(20px) saturate(1.5); -webkit-backdrop-filter: blur(20px) saturate(1.5); transition: transform .15s ease, background .2s, opacity .2s; }
 button.tile:hover { background: linear-gradient(180deg, rgba(255, 255, 255, .19), rgba(255, 255, 255, .08)); }
 button.tile:active { transform: scale(.96); }
-.t-now { grid-column: 1 / 3; grid-row: 1 / 3; padding: 12px 12px 8px; display: grid; grid-template-rows: auto 1fr auto auto; gap: 5px; }
-.t-now .tn { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 10px; align-items: center; }
-.t-now .art { width: 46px; height: 46px; border-radius: 11px; }
-.t-now .nt b { font-size: 13.5px; } .t-now .nt span { font-size: 12px; }
-.tctl { display: flex; justify-content: center; align-items: center; gap: 12px; }
-.tctl button { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; transition: background .2s, transform .12s; }
-.tctl button:hover { background: rgba(255, 255, 255, .12); }
-.tctl button:active { transform: scale(.9); }
-.tctl svg { width: 19px; height: 19px; fill: currentColor; }
-.tctl .c-play svg { width: 23px; height: 23px; }
-.t-sq { display: grid; place-items: center; align-content: center; gap: 6px; padding: 0 6px; font-size: 11px; font-weight: 600; color: var(--ink2); }
-.ti { width: 36px; height: 36px; flex: none; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .13); color: #fff; transition: background .2s, color .2s; }
+.tile.na { opacity: .5; }
+.t-sq { display: grid; place-items: center; align-content: center; gap: 5px; padding: 0 4px; font-size: 10.5px; font-weight: 600; color: var(--ink2); }
+.t-sq small { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10.5px; }
+.ti { width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .13); color: #fff; transition: background .25s, color .25s; }
 .ti svg { width: 17px; height: 17px; }
-.t-sq small { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
-.t-like .ti svg { fill: none; }
-.t-like.on .ti { background: var(--acc); color: #000; }
-.t-like.on .ti svg { fill: currentColor; }
-.t-wide { grid-column: 3 / 5; display: flex; align-items: center; gap: 10px; padding: 0 12px; }
+.tile.on .ti { background: #0a84ff; color: #fff; }
+.c-dark.on .ti, .c-focus.on .ti { background: #fff; color: #000; }
+.t-wide { grid-column: span 2; display: flex; align-items: center; gap: 10px; padding: 0 12px; }
 .t-wide .tw { min-width: 0; display: grid; }
-.t-wide .tw b { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-wide .tw b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .t-wide .tw span { font-size: 11.5px; color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.t-dc .ti { background: var(--dc); }
-.t-dc .ti svg { width: 20px; height: 20px; }
-.t-dc.new .ti { box-shadow: 0 0 0 3px rgba(88, 101, 242, .35), 0 0 14px rgba(88, 101, 242, .8); }
-.t-vol { grid-column: 1 / 5; display: flex; align-items: center; gap: 10px; padding: 0 14px; }
-.t-vol svg { width: 18px; height: 18px; flex: none; color: var(--ink2); }
-.t-vol input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; height: 22px; margin: 0; border-radius: 11px; overflow: hidden; cursor: pointer;
+.t-slider { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 7px; align-content: center; padding: 0 14px; }
+.t-slider > b { grid-column: 1 / -1; font-size: 12.5px; }
+.t-slider > svg { width: 16px; height: 16px; color: var(--ink2); align-self: center; }
+.t-slider > button { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: var(--ink2); background: rgba(255, 255, 255, .1); }
+.t-slider > button svg { width: 14px; height: 14px; }
+.t-slider > button[aria-pressed="true"] { color: #000; background: #fff; }
+.setp .t-slider input[type=range] { -webkit-appearance: none; appearance: none; height: 22px; margin: 0; border-radius: 11px; overflow: hidden; cursor: pointer;
   background: linear-gradient(#fff, #fff) 0 0 / calc(var(--v, 50) * 1%) 100% no-repeat, rgba(255, 255, 255, .14); }
-.t-vol input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: -2px 0 6px rgba(0, 0, 0, .25); }
-.t-vol input:disabled { opacity: .35; cursor: default; }
+.setp .t-slider input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: -2px 0 6px rgba(0, 0, 0, .25); }
+.setp .t-slider input:disabled { opacity: .35; cursor: default; }
+.ctrl-note { margin: 0 4px; font-size: 11px; color: var(--ink2); }
+.ctrl-note:empty { display: none; }
 
 /* the drop-down cards: a song that started, a Discord message; a glass card floats just below the closed island (above
    it, when it sits at the bottom of a screen), then goes */
@@ -242,7 +236,7 @@ body.moving, body.moving * { cursor: grabbing !important; }
 #isl[data-l="3"] .h-full { display: none; }
 
 /* 1 · peek: what plays, or Discord's latest */
-.peek { top: 90px; padding: 2px 14px 14px; }
+.peek { top: 90px; padding: 4px 18px 14px; }
 .now { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px; align-items: center; }
 .art { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; background: #1a1a1e; box-shadow: 0 6px 18px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(255, 255, 255, .06); cursor: pointer; transition: transform .3s var(--ease); }
 .art:hover { transform: scale(1.04); }
@@ -423,6 +417,11 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   </div>
   <div class="lv setp">
     <div class="set-scroll"><div class="set-in">
+      <section class="s-ctrls" hidden>
+        <h3>Controls</h3>
+        <div class="ctrls"></div>
+        <p class="ctrl-note" aria-live="polite"></p>
+      </section>
       <section>
         <h3>Accent</h3>
         <div class="grp">
@@ -451,13 +450,14 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
         <h3>Menu bar</h3>
         <div class="grp">
           <button type="button" class="row s-menubar" role="switch" aria-checked="false"><span>Menu bar mode</span><i class="tg"></i></button>
+          <div class="row stack s-mbscreen" hidden><span>Screen</span><span class="segs s-screens" role="group" aria-label="Which screen"></span></div>
         </div>
         <p class="hint">The island hangs from the notch at the top of your screen, and the song playing is written in the menu bar. Click Astrum's menu bar icon to open it.</p>
       </section>
       <section>
         <h3>Position</h3>
         <div class="grp">
-          <div class="row stack"><span>Where it stays</span><span class="segs s-place" role="group" aria-label="Where it stays">
+          <div class="row stack s-where"><span>Where it stays</span><span class="segs s-place" role="group" aria-label="Where it stays">
             <button type="button" data-v="spot" title="Stays where you drop it (drag it by its grip)">This spot</button>
             <button type="button" data-v="screen" title="Stays at the top middle of the screen you drop it on">This screen</button>
             <button type="button" data-v="roam" title="Goes to the screen your mouse is on">Follow the mouse</button></span></div>
@@ -506,6 +506,14 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     heart: '<svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
     devices: '<svg viewBox="0 0 24 24"><path d="M3 5h14v11H3zM7 20h6m5-10h3v10h-5v-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     note: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 17.5a2.5 2.5 0 1 1-2-2.45V5l11-2v11.5a2.5 2.5 0 1 1-2-2.45V6.4L9 7.7z"/></svg>',
+    wifi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.3a9.5 9.5 0 0 1 13 0M8.6 15.6a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none"/></svg>',
+    bt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>',
+    moon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>',
+    contrast: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg>',
+    shot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5h3M20 8V5h-3M4 16v3h3M20 16v3h-3"/><circle cx="12" cy="12" r="3"/></svg>',
+    lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+    sunlo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.5"/><path d="M12 4v1.5M12 18.5V20M4 12h1.5M18.5 12H20M6.3 6.3l1 1M16.7 16.7l1 1M6.3 17.7l1-1M16.7 7.3l1-1"/></svg>',
+    mute: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10z" fill="currentColor"/><path d="M17 9l5 6M22 9l-5 6"/></svg>',
     spark: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.9 6.1 6.1 1.9-6.1 1.9L12 18.5l-1.9-6.1-6.1-1.9 6.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" opacity=".7"/></svg>',
     vol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
     dcw: '<svg viewBox="0 0 24 24"><path d="M7.3 6.6c1.5-.6 3-.9 4.7-.9s3.2.3 4.7.9c1.5 2.1 2.2 4.5 2.1 7.1-1.4 1.1-2.9 1.8-4.5 2.1l-.9-1.4c.7-.3 1.4-.6 2-1-2.5 1.1-4.7 1.1-6.8 0 .6.4 1.3.7 2 1l-.9 1.4c-1.6-.3-3.1-1-4.5-2.1-.1-2.6.6-5 2.1-7.1z" fill="#fff"/><circle cx="9.6" cy="11.4" r="1.2" fill="#5865f2"/><circle cx="14.4" cy="11.4" r="1.2" fill="#5865f2"/></svg>',
@@ -580,14 +588,16 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     else pt.classList.remove('mq');
   }
 
-  /* ---------- 1 · peek: the type bar, then what plays as Control Center tiles ---------- */
+  /* ---------- 1 · peek: the type bar, then what plays ---------- */
   function openDevices() { go(2); api.openDevices(); }
-  function btn(cls, icon, title, fn) { var x = el('button', cls); x.type = 'button'; x.innerHTML = icon; x.title = title; x.setAttribute('aria-label', title); x.addEventListener('click', fn); return x; }
-  function tctl(src, t) {
-    var c = el('div', 'tctl');
-    c.appendChild(btn('c-prev', IC.prev, 'Previous', function () { api.control(src, 'prev'); }));
-    c.appendChild(btn('c-play', t && t.playing ? IC.pause : IC.play, t && t.playing ? 'Pause' : 'Play', function () { api.control(src, 'play'); }));
-    c.appendChild(btn('c-next', IC.next, 'Next', function () { api.control(src, 'next'); }));
+  function ctlRow(src, t) {
+    var c = el('div', 'ctl');
+    function b(cls, icon, title, fn) { var x = el('button', cls); x.type = 'button'; x.innerHTML = icon; x.title = title; x.setAttribute('aria-label', title); x.addEventListener('click', fn); c.appendChild(x); }
+    if (src === 'sp') b('c-like' + (api.liked() ? ' on' : ''), IC.heart, 'Like', function () { api.like(); setTimeout(paintPeek, 250); });
+    b('c-prev', IC.prev, 'Previous', function () { api.control(src, 'prev'); });
+    b('c-play', t && t.playing ? IC.pause : IC.play, t && t.playing ? 'Pause' : 'Play', function () { api.control(src, 'play'); });
+    b('c-next', IC.next, 'Next', function () { api.control(src, 'next'); });
+    if (src === 'sp') b('c-dev', IC.devices, 'Choose a Spotify device', openDevices);
     return c;
   }
   function sqTile(cls, icon, label, title, fn) {
@@ -599,40 +609,6 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     var i = el('span', 'ti'); i.innerHTML = icon; var w = el('span', 'tw'); w.append(el('b', null, head), el('span', null, line));
     b.append(i, w); b.addEventListener('click', fn); return b;
   }
-  function tiles(src, t) {
-    var g = el('div', 'tiles');
-    // what plays: the cover (it opens the full view), the song, the time, the buttons
-    var now = el('div', 'tile t-now'), top = el('div', 'tn'), art = el('img', 'art'); art.alt = ''; if (t.art) art.src = t.art; art.title = 'Cover the screen';
-    art.addEventListener('click', function () { go(3); });
-    var tx = el('div', 'nt'); tx.append(el('b', null, t.title), el('span', null, t.artist || (src === 'yt' ? 'YouTube' : '')));
-    top.append(art, tx);
-    var bar = el('div', 'nbar'); bar.appendChild(el('i'));
-    var tm = el('div', 'ntime'); tm.append(el('span', 'tcur', '0:00'), el('span', null, fmt(t.duration)));
-    now.append(top, el('span'), bar, tm, tctl(src, t)); now.style.gridTemplateRows = 'auto 1fr auto auto auto';
-    g.appendChild(now);
-    if (src === 'sp') {
-      var on = api.liked();
-      g.appendChild(sqTile('t-like' + (on ? ' on' : ''), IC.heart, on ? 'Liked' : 'Like', on ? 'Remove from Liked Songs' : 'Save to Liked Songs', function () { api.like(); setTimeout(paintPeek, 300); }));
-      g.appendChild(sqTile('t-dev', IC.devices, api.device() || 'Devices', 'Choose a Spotify device', openDevices));
-    } else {
-      g.appendChild(sqTile('t-full', IC.full, 'Full screen', 'Watch on the whole screen', function () { go(3); }));
-      g.appendChild(sqTile('t-open', IC.more, 'Player', 'Open the player', function () { go(2); }));
-    }
-    // Discord: new messages, or what your profile shows
-    var u = unread(), m = leading();
-    g.appendChild(wideTile('t-dc' + (u ? ' new' : ''), IC.dcw, 'Discord',
-      !dcSetUp() ? 'Set it up' : u ? u + ' new message' + (u > 1 ? 's' : '') : dcStatus.ok ? (m ? 'Showing on your profile' : 'Connected') : (dcStatus.text || 'Messages'),
-      'Open Discord', function () { if (!dcSetUp()) { guide('discord'); return; } sticky = true; tab = 'dc'; render(); }));
-    // the volume of where it plays
-    var vol = el('div', 'tile t-vol'), r = el('input'); r.type = 'range'; r.min = 0; r.max = 100; r.setAttribute('aria-label', 'Volume');
-    var v = api.volume(src); r.disabled = v == null; r.value = v == null ? 50 : v; r.style.setProperty('--v', r.value);
-    r.addEventListener('input', function () { r.style.setProperty('--v', r.value); api.volume(src, +r.value); });
-    vol.insertAdjacentHTML('beforeend', IC.vol); vol.appendChild(r);
-    if (v == null) vol.title = src === 'sp' ? 'This device does not let its volume be changed' : 'Play something first';
-    g.appendChild(vol);
-    return g;
-  }
-
   /* the type bar: a song, an artist or a vibe; Enter finds it (Spotify), or searches (YouTube); Enter again plays the first */
   var ask = $('.ask form'), askIn = $('.ask input'), askRes = null, askQ = '', askSel = 0, askBusy = false;
   $('.ask .ai').innerHTML = IC.spark;
@@ -713,7 +689,11 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
       p.appendChild(watch);
       return;
     }
-    p.appendChild(tiles(tab, t));
+    var n = el('div', 'now'), art = el('img', 'art'); art.alt = ''; if (t.art) art.src = t.art; art.title = 'Cover the screen'; art.addEventListener('click', function () { go(3); });
+    var tx = el('div', 'nt'); tx.appendChild(el('b', null, t.title)); tx.appendChild(el('span', null, t.artist || (tab === 'yt' ? 'YouTube' : '')));
+    var bar = el('div', 'nbar'); bar.appendChild(el('i')); tx.appendChild(bar);
+    var tm = el('div', 'ntime'); tm.appendChild(el('span', 'tcur', '0:00')); tm.appendChild(el('span', null, fmt(t.duration))); tx.appendChild(tm);
+    n.appendChild(art); n.appendChild(tx); p.append(n, ctlRow(tab, t));
     tickPeek();
   }
   function tickPeek() {
@@ -831,6 +811,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     if (level > 0) hideCard();
     $('.dcp').classList.toggle('on', level >= 2 && tab === 'dc' && !setOpen);
     $('.setp').classList.toggle('on', setOpen);
+    if (setOpen !== watchSys.was) { watchSys.was = setOpen; watchSys(); }
     var np = level === 2 && tab !== 'dc' && !setOpen;
     body.classList.toggle('show-np', np);
     tint(); live();
@@ -912,7 +893,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   var moving = false;
   $$('.grip').forEach(function (g) {
     g.addEventListener('pointerdown', function (e) {
-      if (e.button !== 0 || !D || !D.island.drag) return;
+      if (e.button !== 0 || !D || !D.island.drag || (ov && ov.notch)) return;
       e.preventDefault(); e.stopPropagation(); g.setPointerCapture(e.pointerId);
       moving = true; body.classList.add('moving'); clearTimeout(hoverT); clearTimeout(leaveT);
       var r = isl.getBoundingClientRect();
@@ -965,7 +946,18 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     if (!st) return;
     $$('.s-place button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === (st.placement || 'spot'))); });
     $('.s-mbsec').hidden = !st.notchOk;   // a Mac's
-    $('.s-menubar').setAttribute('aria-checked', String(st.placement === 'notch'));
+    var nb = st.placement === 'notch';
+    $('.s-menubar').setAttribute('aria-checked', String(nb));
+    // in Menu bar mode it is always on top and lives on a notch: only the screen is chosen
+    $('.s-where').hidden = nb; $('.s-top').hidden = nb;
+    $('.s-mbscreen').hidden = !nb || !(st.screens && st.screens.length > 1);
+    var ss = $('.s-screens'); ss.textContent = '';
+    (st.screens || []).forEach(function (d) {
+      var b = el('button', null, d.name); b.type = 'button'; b.title = d.size + (d.primary ? ' · main screen' : '');
+      b.setAttribute('aria-pressed', String(d.id === st.screen));
+      b.addEventListener('click', function () { D.settings.set({ notchScreen: d.id }).then(paintPosition); });
+      ss.appendChild(b);
+    });
     $('.s-top').setAttribute('aria-checked', String(st.alwaysOnTop !== false));
     var keys = $('.s-key'), opts = st.mac ? [['CommandOrControl+Shift+Space', '⌘⇧Space'], ['Alt+Space', '⌥Space'], ['', 'Off']] : [['CommandOrControl+Shift+Space', 'Ctrl+Shift+Space'], ['Alt+Space', 'Alt+Space'], ['', 'Off']];
     if (!keys.childNodes.length) opts.forEach(function (o) {
@@ -1069,6 +1061,69 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
       img: m.author.avatar, round: true, icon: IC.dc, ms: 8000, actions: [
         { label: 'Show all', fn: function () { tab = 'dc'; sticky = true; go(2); } },
         { label: 'Reply', pri: true, fn: function () { window.open(m.url, '_blank'); } }] });
+  }
+
+  /* ---------- Settings › Controls: the computer's own sound, brightness, dark mode, Wi-Fi, Bluetooth (main.js, lib/system.js) ---------- */
+  var sys = {}, sysT = 0, sysBusy = {}, ctrl = null;
+  function sysNote(t) { var n = $('.ctrl-note'); n.textContent = t || ''; clearTimeout(sysNote.t); if (t) sysNote.t = setTimeout(function () { n.textContent = ''; }, 6000); }
+  function sysSet(k, v) {
+    sys[k] = v; paintControls();
+    return D.system.set(k, v).then(function (r) { if (r && !r.ok) sysNote('Could not change that here' + (r.error ? ': ' + r.error : '') + '.'); setTimeout(refreshSys, 700); });
+  }
+  function sysAct(a, then) { D.system.act(a).then(function (r) { if (r && !r.ok) sysNote('Not available on this computer.'); else if (then) then(); }); }
+  function slider(cls, label, lo, hi, key) {
+    var t = el('div', 'tile t-slider ' + cls), r = el('input'), lh = el('span'); lh.innerHTML = lo;
+    r.type = 'range'; r.min = 0; r.max = 100; r.setAttribute('aria-label', label);
+    t.append(el('b', null, label), lh.firstChild, r); t.insertAdjacentHTML('beforeend', hi);
+    var tm = 0;
+    r.addEventListener('input', function () { sysBusy[key] = Date.now(); r.style.setProperty('--v', r.value); clearTimeout(tm); tm = setTimeout(function () { sysSet(key, +r.value); }, 180); });
+    r.addEventListener('change', function () { sysBusy[key] = Date.now(); });
+    return { tile: t, input: r };
+  }
+  function mountControls() {
+    if (ctrl || !D || !D.system) return;
+    $('.s-ctrls').hidden = false;
+    var g = $('.ctrls'); ctrl = {};
+    ctrl.wifi = wideTile('c-wifi', IC.wifi, 'Wi-Fi', '…', 'Wi-Fi', function () { if (sys.wifi == null) sysAct('wifi-settings'); else sysSet('wifi', !sys.wifi); });
+    ctrl.bt = wideTile('c-bt', IC.bt, 'Bluetooth', '…', 'Bluetooth', function () { if (sys.bluetooth == null) sysAct('bluetooth-settings'); else sysSet('bluetooth', !sys.bluetooth); });
+    ctrl.dark = sqTile('c-dark', IC.contrast, 'Dark mode', 'Dark mode', function () { sysSet('dark', !sys.dark); });
+    ctrl.focus = sqTile('c-focus', IC.moon, 'Focus', 'Focus / Do Not Disturb settings', function () { sysAct('focus'); });
+    ctrl.shot = sqTile('c-shot', IC.shot, 'Screenshot', 'Take a screenshot', function () { sticky = false; go(0); setTimeout(function () { sysAct('screenshot'); }, 350); });
+    ctrl.lock = sqTile('c-lock', IC.lock, 'Lock', 'Lock the screen', function () { sysAct('lock'); });
+    ctrl.disp = slider('c-disp', 'Display', IC.sunlo, IC.sunlo.replace('r="3.5"', 'r="4.5"'), 'brightness');
+    ctrl.snd = slider('c-snd', 'Sound', IC.vol, '', 'volume');
+    ctrl.mute = el('button'); ctrl.mute.type = 'button'; ctrl.mute.innerHTML = IC.mute; ctrl.mute.title = 'Mute'; ctrl.mute.setAttribute('aria-label', 'Mute');
+    ctrl.mute.addEventListener('click', function () { sysSet('muted', !sys.muted); });
+    ctrl.snd.tile.appendChild(ctrl.mute);
+    // the labels of the sliders open the system's own settings
+    ctrl.disp.tile.querySelector('b').addEventListener('click', function () { sysAct('display-settings'); });
+    ctrl.snd.tile.querySelector('b').addEventListener('click', function () { sysAct('sound-settings'); });
+    g.append(ctrl.wifi, ctrl.bt, ctrl.dark, ctrl.focus, ctrl.shot, ctrl.lock, ctrl.disp.tile, ctrl.snd.tile);
+  }
+  function paintControls() {
+    if (!ctrl) return;
+    ctrl.wifi.classList.toggle('on', !!sys.wifi);
+    ctrl.wifi.querySelector('.tw span').textContent = sys.wifi == null ? 'Open settings' : sys.wifi ? (sys.wifiName || 'On') : 'Off';
+    ctrl.bt.classList.toggle('on', !!sys.bluetooth);
+    ctrl.bt.querySelector('.tw span').textContent = sys.bluetooth == null ? 'Open settings' : sys.bluetooth ? 'On' : 'Off';
+    ctrl.dark.classList.toggle('on', !!sys.dark); ctrl.dark.classList.toggle('na', sys.dark == null);
+    function put(sl, key, v, why) {
+      if (Date.now() - (sysBusy[key] || 0) < 1500) return;   // not while it is being dragged
+      sl.input.disabled = v == null; sl.input.value = v == null ? 50 : v; sl.input.style.setProperty('--v', sl.input.value);
+      sl.tile.classList.toggle('na', v == null); sl.tile.title = v == null ? why : '';
+    }
+    put(ctrl.disp, 'brightness', sys.brightness, settings.mac ? 'To change it here, install the free “brightness” tool (brew install brightness). Click Display for the settings.' : 'This screen does not let apps change its brightness. Click Display for the settings.');
+    put(ctrl.snd, 'volume', sys.volume, 'The sound can not be read here. Click Sound for the settings.');
+    ctrl.mute.setAttribute('aria-pressed', String(!!sys.muted)); ctrl.mute.disabled = sys.muted == null;
+  }
+  function refreshSys() {
+    if (!ctrl || !setOpen) return;
+    D.system.get().then(function (s) { if (s) { sys = s; paintControls(); } });
+  }
+  function watchSys() {   // while the settings are open, the tiles follow changes made elsewhere (the keyboard's volume keys...)
+    clearInterval(sysT);
+    if (!setOpen || !D || !D.system) return;
+    mountControls(); refreshSys(); sysT = setInterval(refreshSys, 4000);
   }
 
   /* ---------- the app: settings, Discord ---------- */
