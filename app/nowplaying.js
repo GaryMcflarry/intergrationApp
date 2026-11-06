@@ -107,7 +107,6 @@ window.NowPlaying = (function () {
     '/* Now: the cover, with the album and its year laid over it as a backdrop; the artist below */',
     '.np-hero{position:relative;border-radius:14px;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.5);background:#222}',
     '.np-cover{width:100%;aspect-ratio:1;object-fit:cover;display:block}',
-    '.np-yr{position:absolute;right:12px;top:6px;font-size:60px;font-weight:700;line-height:1;letter-spacing:.04em;color:#fff;opacity:.2;text-shadow:0 2px 20px rgba(0,0,0,.5);pointer-events:none}',
     '.np-back{position:absolute;left:0;right:0;bottom:0;display:grid;gap:2px;padding:48px 14px 12px;background:linear-gradient(transparent,rgba(4,4,12,.88))}',
     '.np-rel{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(245,243,255,.72)}',
     '.np-album{font-weight:700;font-size:15px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
@@ -401,7 +400,7 @@ window.NowPlaying = (function () {
       '<div class="np-more"><div class="np-bands" role="tablist" aria-label="Player">' +
       BANDS.map(function (b, i) { return '<button type="button" role="tab" data-p="' + b[0] + '" aria-selected="' + (i ? 'false' : 'true') + '" tabindex="' + (i ? -1 : 0) + '">' + b[1] + '</button>'; }).join('') + '</div>' +
       '<section class="np-pane on" data-pane="now" role="tabpanel" aria-label="Now">' +
-      '<div class="np-hero"><img class="np-cover" alt=""><span class="np-yr" aria-hidden="true"></span><div class="np-back"><span class="np-rel"></span><b class="np-album"></b></div></div>' +
+      '<div class="np-hero"><img class="np-cover" alt=""><div class="np-back"><span class="np-rel"></span><b class="np-album"></b></div></div>' +
       '<div class="np-artist"><img class="np-aimg" alt=""><span class="np-awho"><b class="np-aname"></b><span class="np-genre"></span></span></div>' +
       '<div class="np-seek np-ctl"><span class="np-cur">0:00</span><input type="range" class="np-pos" min="0" max="1000" value="0" aria-label="Position"><span class="np-dur">0:00</span></div>' +
       '<div class="np-tg np-ctl"><button type="button" class="np-tog np-shuf" aria-label="Shuffle" aria-pressed="false">' + ICON.shuffle + '</button>' +
@@ -870,8 +869,7 @@ window.NowPlaying = (function () {
     function nowInfo() {
       if (!S || !S.item) return; var it = S.item, al = it.album, ar = it.artists && it.artists[0], id = it.id;
       $('.np-album').textContent = al ? al.name : it.show ? it.show.name : '';
-      var yr = year(al ? al.release_date : it.release_date); $('.np-yr').textContent = yr;
-      function rel(label) { $('.np-rel').textContent = [yr, al && al.album_type === 'single' ? 'Single' : al && al.album_type === 'compilation' ? 'Compilation' : al ? 'Album' : 'Episode', label].filter(Boolean).join(' · '); }
+      function rel(label) { $('.np-rel').textContent = [al && al.album_type === 'single' ? 'Single' : al && al.album_type === 'compilation' ? 'Compilation' : al ? 'Album' : 'Episode', label].filter(Boolean).join(' · '); }
       rel(''); $('.np-aname').textContent = ar ? ar.name : it.show ? it.show.publisher || '' : ''; $('.np-aimg').removeAttribute('src'); $('.np-genre').textContent = '';
       if (al && al.id) get('/albums/' + al.id).then(function (a) { if (S && S.item && S.item.id === id && a) rel(a.label ? a.label + (a.total_tracks ? ' · ' + a.total_tracks + ' songs' : '') : ''); }).catch(function () { });
       if (ar && ar.id) get('/artists/' + ar.id).then(function (a) {
