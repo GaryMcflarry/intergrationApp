@@ -1,0 +1,69 @@
+# Tests, builds the image into Gitea's container registry, then asks Dokploy to
+# redeploy. Needs these repository settings (Settings → Actions):
+#   Variables: IMAGE              e.g. gitea.example.com/chad/telemetry (lowercase)
+#              REGISTRY           e.g. gitea.example.com
+#              REGISTRY_USER      Gitea user that owns REGISTRY_TOKEN
+#   Secrets:   REGISTRY_TOKEN       Gitea access token with write:package
+#              DOKPLOY_WEBHOOK_URL  Webhook URL from the Dokploy service's
+#                                   Deployments tab (auto-deploy must be on)
+name: Check and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
+
+  build:
+    if: ${{ vars.IMAGE != '' }}
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.REGISTRY }}
+          username: ${{ vars.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: true
+          tags: |
+            ${{ vars.IMAGE }}:latest
+            ${{ vars.IMAGE }}:${{ gitea.sha }}
+
+  deploy:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      # Sent as a Gitea push event for main, so Dokploy's branch check (if any) passes.
+      - name: Trigger Dokploy redeploy
+        env:
+          WEBHOOK: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
+        run: |
+          status=$(curl -sS -o response.txt -w "%{http_code}" -X POST "$WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -H "X-Gitea-Event: push" \
+            -d '{"ref":"refs/heads/main"}')
+          cat response.txt; echo
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "Dokploy answered HTTP $status"
+            exit 1
+          fi
