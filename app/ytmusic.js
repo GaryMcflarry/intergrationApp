@@ -140,18 +140,17 @@ window.YTMusic = (function () {
       '<button type="button" class="np-wide" aria-label="Expand" title="Expand">' + ICON.wide + '</button><button type="button" class="np-exp" aria-label="More" aria-expanded="false">' + ICON.open + '</button></div>' +
       '<span class="np-line" aria-hidden="true"><i></i></span></div>' +
       '<div class="np-more"><div class="np-bands" role="tablist" aria-label="YouTube">' +
-      [['now', 'Watch'], ['you', 'Discover'], ['pl', 'Playlists'], ['search', 'Search']].map(function (b, i) { return '<button type="button" role="tab" data-p="' + b[0] + '" aria-selected="' + (i ? 'false' : 'true') + '">' + b[1] + '</button>'; }).join('') + '</div>' +
+      [['pl', 'Playlists'], ['now', 'Watch'], ['search', 'Search']].map(function (b, i) { return '<button type="button" role="tab" data-p="' + b[0] + '" aria-selected="' + (i ? 'false' : 'true') + '">' + b[1] + '</button>'; }).join('') + '</div>' +
       '<section class="np-pane on" data-pane="now" role="tabpanel" aria-label="Watch"><div class="np-hero yt-vid"><div class="yt-ph"><span>' + ICON.mix + '<em>Search or paste a YouTube link to start</em></span></div></div>' +
       '<div class="np-acts"><button type="button" class="yt-fullscreen" hidden>' + ICON.full + 'Full screen</button><button type="button" class="yt-mixnow">' + ICON.mix + 'Mix from this video</button><button type="button" class="yt-shuf">' + ICON.shuffle + 'Shuffle my likes</button></div>' +
-      '<p class="np-note yt-error" role="status"></p><div class="np-foot"><span class="yt-ch"></span><a class="np-link yt-link" target="_blank" rel="noopener" href="https://www.youtube.com">Open in YouTube ↗</a></div><div class="np-acts np-shares" hidden><button type="button" class="yt-share">' + ICON.share + 'Share to Discord</button></div></section>' +
-      '<section class="np-pane" data-pane="you" role="tabpanel" aria-label="Discover"><ul class="np-list yt-yl"></ul></section>' +
+      '<p class="np-note yt-error" role="status"></p><div class="np-foot"><span class="yt-ch"></span><a class="np-link yt-link" target="_blank" rel="noopener" href="https://www.youtube.com">Open in YouTube ↗</a></div><ul class="np-list yt-suggestions" aria-label="Suggestions from your liked videos" hidden></ul><div class="np-acts np-shares" hidden><button type="button" class="yt-share">' + ICON.share + 'Share to Discord</button></div></section>' +
       '<section class="np-pane" data-pane="pl" role="tabpanel" aria-label="Playlists"><ul class="np-list yt-pl"></ul><div class="np-foot"><span class="yt-when"></span><span class="np-acts"><button type="button" class="yt-refresh">' + ICON.redo + 'Refresh library</button></span></div></section>' +
       '<section class="np-pane" data-pane="search" role="tabpanel" aria-label="Search"><form class="np-gform yt-sform"><input type="search" class="np-q" placeholder="Search or paste a video link" aria-label="Search YouTube or paste a video link" autocomplete="off" spellcheck="false"><button type="submit">Search</button></form><ul class="np-list yt-sl"></ul></section></div>';
     function $(c) { return root.querySelector(c); }
     function $$(c) { return Array.prototype.slice.call(root.querySelectorAll(c)); }
     var NOTE = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#3a1418"/><circle cx="20" cy="20" r="11" fill="none" stroke="#ff8a84" stroke-width="2"/><path d="M17 15v10l8-5z" fill="#ff8a84"/></svg>');
     $('.np-art').src = NOTE; $('.np-art').onerror = function () { if (this.getAttribute('src') !== NOTE) this.src = NOTE; };
-    var player = null, ready = null, playing = false, cur = null, pane = 'now', loadSerial = 0, playbackError = '';
+    var player = null, ready = null, playing = false, cur = null, pane = 'pl', loadSerial = 0, playbackError = '';
 
     var flashT = 0;
     function flash(msg, ok) { var a = $('.np-a'); clearTimeout(flashT); a.textContent = msg; a.classList.add('fl'); a.classList.toggle('bad', !ok); flashT = setTimeout(function () { a.classList.remove('fl', 'bad'); paint(); }, 4500); }
@@ -173,7 +172,15 @@ window.YTMusic = (function () {
               onStateChange: function (e) { playing = e.data === 1; if (playing) { showPlaybackError(''); host.pauseOther(); keep(); } paint(); },
               onError: function (e) {
                 playing = false;
-                showPlaybackError(e.data === 101 || e.data === 150 ? 'This video can only be watched on YouTube.' : 'YouTube could not play this video.');
+                var reasons = {
+                  2: 'YouTube rejected this video link. Check the link and try again.',
+                  5: 'YouTube could not play this video in the embedded player. Try another video or open it on YouTube.',
+                  100: 'This video is unavailable, private, or has been removed.',
+                  101: 'The video owner has disabled embedded playback. Open this video on YouTube.',
+                  150: 'The video owner has disabled embedded playback. Open this video on YouTube.',
+                  153: 'YouTube could not identify the embedded player. Reload Astrum and try again.'
+                };
+                showPlaybackError((reasons[e.data] || 'YouTube could not play this video.') + ' (YouTube error ' + e.data + ')');
                 var ids = player.getPlaylist(), index = player.getPlaylistIndex(), attempt = loadSerial;
                 if (ids && index >= 0 && index + 1 < ids.length) setTimeout(function () { if (attempt === loadSerial && !playing) player.nextVideo(); }, 1200);
                 paint();
@@ -189,18 +196,20 @@ window.YTMusic = (function () {
       var d = player && player.getVideoData ? player.getVideoData() : null; if (!d || !d.video_id) return null;
       var cur2 = player.getCurrentTime ? player.getCurrentTime() || 0 : 0, dur = player.getDuration ? player.getDuration() || 0 : 0;
       return { source: 'youtube', id: d.video_id, title: d.title || '', artist: d.author || '', album: 'YouTube',
-        art: 'https://i.ytimg.com/vi/' + d.video_id + '/hqdefault.jpg', url: watchUrl(d.video_id), playing: playing, start: Date.now() - cur2 * 1000, duration: dur * 1000 };
+        art: 'https://i.ytimg.com/vi/' + d.video_id + '/hqdefault.jpg', url: watchUrl(d.video_id), playing: playing, audio: playing && !(player.isMuted && player.isMuted()) && !(player.getVolume && player.getVolume() === 0), start: Date.now() - cur2 * 1000, duration: dur * 1000 };
     }
     function emitTrack() {
       var t = trackObj(), id = t ? t.id : '', on = !!(t && playing);
-      if (lastEmit && lastEmit.id === id && lastEmit.on === on && (!t || Math.abs(lastEmit.start - t.start) < 4000)) return;
-      lastEmit = { id: id, on: on, start: t ? t.start : 0 };
+      if (lastEmit && lastEmit.id === id && lastEmit.on === on && lastEmit.audio === !!(t && t.audio) && (!t || Math.abs(lastEmit.start - t.start) < 4000)) return;
+      lastEmit = { id: id, on: on, audio: !!(t && t.audio), start: t ? t.start : 0 };
       window.dispatchEvent(new CustomEvent('np:track', { detail: t || { source: 'youtube', playing: false } }));
     }
     function paint() {
       root.classList.toggle('playing', playing);
       var p = $('.np-play'); p.innerHTML = playing ? ICON.pause : ICON.play; p.setAttribute('aria-label', playing ? 'Pause' : 'Play');
       var d = player && player.getVideoData ? player.getVideoData() : null, fl = $('.np-a').classList.contains('fl');
+      cur = d && d.video_id ? d : null;
+      root.classList.toggle('yt-empty', !(d && d.video_id));
       if (d && d.video_id) {
         cur = d; $('.np-t span').textContent = d.title || 'YouTube';
         var who = d.author || '';
@@ -211,12 +220,13 @@ window.YTMusic = (function () {
       $('.yt-mixnow').hidden = !(cur && cur.video_id);
       $('.yt-fullscreen').hidden = !(host.openFull && cur && cur.video_id);
       var lib = library(); $('.yt-shuf').hidden = !(lib && lib.liked.length);
-      pipPaint(); if (host.onChange) host.onChange(); emitTrack();
+      fillSuggestions(); pipPaint(); if (host.onChange) host.onChange(); emitTrack();
     }
     setInterval(function () {   // progress
       if (!player || !player.getDuration) return; var d = player.getDuration(), t = player.getCurrentTime();
       var pc = d ? Math.min(100, t / d * 100).toFixed(2) + '%' : '0';
       $('.np-line i').style.width = pc; if (pipWin) pipWin.document.querySelector('.bar i').style.width = pc;
+      emitTrack();
     }, 500);
     // where you were, so a restart (Lively, the rotation) can carry on with the same mix or playlist
     function keep() {
@@ -277,35 +287,18 @@ window.YTMusic = (function () {
       var needsSignIn = e.status === 401 || !token();
       return { empty: needsSignIn ? 'Sign in to YouTube in your browser, then try again.' : e.message, setup: needsSignIn && !LIVELY };
     }
-    var popular = null, popularError = null, popularRequest = null;
-    function loadPopular(tok) {
-      popularError = null;
-      var request = api('videos?part=snippet,status&chart=mostPopular&maxResults=20', tok);
-      popularRequest = request;
-      request.then(function (j) {
-        if (popularRequest !== request) return;
-        popular = (j.items || []).filter(function (v) { return v.id && v.snippet && v.status && v.status.embeddable; });
-      }, function (e) { if (popularRequest === request) popularError = e; }).finally(function () {
-        if (popularRequest !== request) return;
-        popularRequest = null;
-        if (pane === 'you') fillYou();
-      });
-    }
-    function fillYou() {
-      var lib = library(), ul = $('.yt-yl'), tok = token(), rows = [{ head: 'Popular on YouTube' }];
-      if (popular && popular.length) popular.forEach(function (v) { rows.push(videoRow(v.id, v.snippet.title, v.snippet.channelTitle)); });
-      else if (popular) rows.push({ empty: 'No embeddable popular videos were returned.' });
-      else if (popularError) rows.push(dataError(popularError));
-      else if (tok) {
-        if (!popularRequest) loadPopular(tok);
-        rows.push({ empty: 'Loading popular videos…' });
-      } else rows.push({ empty: 'Sign in to browse popular videos. You can also paste a video link in Search.', setup: !LIVELY });
-      if (lib && lib.liked.length) {
-        rows.push({ head: 'Mixes from videos you like' });
-        rows.push({ t: 'Liked videos, shuffled', s: lib.liked.length + ' videos', icon: ICON.shuffle, go: function () { start({ ids: likedIds(lib), shuffle: true }, 'your liked videos'); } });
-        lib.liked.slice(0, 8).forEach(function (x) { rows.push({ t: 'Mix · ' + x.t, s: x.c || 'YouTube mix', img: thumb(x.v), go: function () { start({ list: 'RD' + x.v }, 'a mix from ' + x.t); }, full: function () { startFull({ list: 'RD' + x.v }, 'a mix from ' + x.t); } }); });
-      }
-      list(ul, rows);
+    var suggestionKey = '';
+    function fillSuggestions() {
+      var lib = library(), ul = $('.yt-suggestions');
+      var videos = cur && lib && Array.isArray(lib.liked) ? lib.liked.filter(function (x) { return x.v && x.v !== cur.video_id; }) : [];
+      // These are library suggestions, not YouTube's unavailable personalized Home feed.
+      videos.sort(function (a, b) { return Number(b.c === cur.author) - Number(a.c === cur.author); });
+      videos = videos.slice(0, 8);
+      var key = JSON.stringify(videos);
+      ul.hidden = !videos.length;
+      if (suggestionKey === key) return;
+      suggestionKey = key;
+      list(ul, videos.length ? [{ head: 'From your liked videos' }].concat(videos.map(function (x) { return videoRow(x.v, x.t, x.c); })) : []);
     }
     function openPl(e, name, ids, src, known) {
       var ul = e && e.currentTarget && e.currentTarget.closest('ul'); if (!ul) { start(src, name); return; }
@@ -377,7 +370,7 @@ window.YTMusic = (function () {
     }
     function fill(p) {
       if (!host.isBig()) return; p = p || pane;
-      if (p === 'you') fillYou(); else if (p === 'pl') fillPl();
+      if (p === 'pl') fillPl(); else if (p === 'now') fillSuggestions();
       else if (p === 'search' && !$('.yt-sl').firstChild) list($('.yt-sl'), [{ empty: 'Search for videos and music, or paste a YouTube video link to play it directly.' }]);
     }
     $('.yt-refresh').addEventListener('click', function () {
@@ -490,10 +483,10 @@ window.YTMusic = (function () {
     if (last && last.src) $('.yt-ph em').textContent = 'Press play to carry on';
     window.addEventListener('pagehide', function () { if (pipWin) try { pipWin.close(); } catch (e) { } });
     window.addEventListener('storage', function (e) {
-      if (e.key === 'yt-token') { popular = popularError = popularRequest = null; if (pane === 'you') fill(); }
+      if (e.key === 'yt-token') fill();
       if (e.key === LIB) { paint(); fill(); }
     });
-    paint(); sync();
+    paint(); sync(); setPane('pl');
     return {
       fill: fill, sync: sync, vidEl: $('.yt-vid'),
       info: function () {

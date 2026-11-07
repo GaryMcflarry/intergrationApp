@@ -397,7 +397,7 @@ window.NowPlaying = (function () {
       '<div class="np-btns"><button type="button" class="np-prev" aria-label="Previous">' + ICON.prev + '</button><button type="button" class="np-play" aria-label="Pause">' + ICON.pause + '</button>' +
       '<button type="button" class="np-next" aria-label="Next">' + ICON.next + '</button><button type="button" class="np-djbtn" aria-label="DJ mode" title="DJ mode: new songs in a vibe you pick, full page">' + ICON.dj + '</button><button type="button" class="np-wide" aria-label="Expand" aria-pressed="false" title="Expand">' + ICON.wide + '</button><button type="button" class="np-exp" aria-label="More" aria-expanded="false">' + ICON.open + '</button></div>' +
       '<span class="np-line" aria-hidden="true"><i></i></span></div>' +
-      '<div class="np-more"><div class="np-bands" role="tablist" aria-label="Player">' +
+      '<p class="np-empty-status" role="status" hidden></p><div class="np-more"><div class="np-bands" role="tablist" aria-label="Player">' +
       BANDS.map(function (b, i) { return '<button type="button" role="tab" data-p="' + b[0] + '" aria-selected="' + (i ? 'false' : 'true') + '" tabindex="' + (i ? -1 : 0) + '">' + b[1] + '</button>'; }).join('') + '</div>' +
       '<section class="np-pane on" data-pane="now" role="tabpanel" aria-label="Now">' +
       '<div class="np-hero"><img class="np-cover" alt=""><div class="np-back"><span class="np-rel"></span><b class="np-album"></b></div></div>' +
@@ -440,6 +440,8 @@ window.NowPlaying = (function () {
     function setIdle(mode) {
       if (mode === idleMode) { if (mode) show(); return; }
       idleMode = mode; box.classList.toggle('np-idle', !!mode);
+      $('.np-empty-status').hidden = !mode;
+      $('.np-empty-status').textContent = mode === 'connect' ? 'Connect Spotify to show what’s playing.' : mode ? 'Nothing playing. Choose a device or browse your library.' : '';
       if (!mode) { art = ''; return; }
       art = NOTE; $('.np-art').src = NOTE;
       setTitle(mode === 'connect' ? 'Spotify' : 'Nothing playing');
@@ -462,7 +464,13 @@ window.NowPlaying = (function () {
         if (box.classList.contains('big') && (pane === 'now' || pane === 'queue')) fill(pane);
       }
       var img = it.album && it.album.images && it.album.images[0] ? it.album.images[0].url : (it.images && it.images[0] ? it.images[0].url : '');
-      if (img !== art) { art = img; $('.np-art').src = img; $('.np-cover').src = img; tint(img); }
+      $('.np-hero').hidden = !img;
+      $('.np-art').hidden = !img;
+      if (!img) { $('.np-art').removeAttribute('src'); $('.np-cover').removeAttribute('src'); }
+      if (img !== art) {
+        art = img;
+        if (img) { $('.np-art').src = img; $('.np-cover').src = img; tint(img); }
+      }
       box.classList.toggle('playing', !!S.is_playing);
       $('.np-play').innerHTML = S.is_playing ? ICON.pause : ICON.play; $('.np-play').setAttribute('aria-label', S.is_playing ? 'Pause' : 'Play');
       $('.np-shuf').classList.toggle('on', !!S.shuffle_state); $('.np-shuf').setAttribute('aria-pressed', String(!!S.shuffle_state));
@@ -478,25 +486,27 @@ window.NowPlaying = (function () {
     var lastEmit = null;
     function emitTrack() {
       var it = S && S.item, playing = !!(S && S.is_playing && it);
+      var audio = playing && !(S.device && S.device.volume_percent === 0);
       var start = it ? at - (S.progress_ms || 0) : 0, id = it ? it.id || it.uri : '';
-      if (lastEmit && lastEmit.id === id && lastEmit.playing === playing && Math.abs(lastEmit.start - start) < 4000) return;
-      lastEmit = { id: id, playing: playing, start: start };
+      if (lastEmit && lastEmit.id === id && lastEmit.playing === playing && lastEmit.audio === audio && lastEmit.repeat === (S && S.repeat_state) && Math.abs(lastEmit.start - start) < 1000) return;
+      lastEmit = { id: id, playing: playing, audio: audio, start: start, repeat: S && S.repeat_state };
       var img = it && it.album && it.album.images && it.album.images[0] ? it.album.images[0].url : (it && it.images && it.images[0] ? it.images[0].url : '');
       window.dispatchEvent(new CustomEvent('np:track', { detail: it ? {
         source: 'spotify', id: id, title: it.name, artist: (it.artists || it.show && [it.show] || []).map(function (a) { return a.name; }).join(', '),
-        album: it.album ? it.album.name : it.show ? it.show.name : '', art: img, url: it.external_urls && it.external_urls.spotify || '', playing: playing, start: start, duration: it.duration_ms || 0
+        album: it.album ? it.album.name : it.show ? it.show.name : '', art: img, url: it.external_urls && it.external_urls.spotify || '', playing: playing, start: start, duration: it.duration_ms || 0,
+        progress: S.progress_ms || 0, observedAt: at, repeat: S.repeat_state, audio: audio
       } : { source: 'spotify', playing: false } }));
     }
     function currentTrack() { var it = S && S.item; if (!it) return null; lastEmit = null; var d = null; window.addEventListener('np:track', function f(e) { d = e.detail; window.removeEventListener('np:track', f); }); emitTrack(); return d; }
-    var tickAt = 0;
+    var tickAt = 0, seeking = false;
     function tick(now) {   // the position, moved on locally between polls: every frame in the full view, four times a second otherwise
       requestAnimationFrame(tick);
-      if (document.hidden || (!djOpen && now - tickAt < 250)) return;
+      if ((document.hidden && !opts.app) || (!djOpen && now - tickAt < 250)) return;
       tickAt = now;
       if (S && S.item) {
-        var pos = Math.min(S.item.duration_ms, S.progress_ms + (S.is_playing ? Date.now() - at : 0)), f = pos / S.item.duration_ms, pc = (f * 100).toFixed(2) + '%';
+        var pos = PlaybackClock.position(S, at, Date.now()), f = S.item.duration_ms ? pos / S.item.duration_ms : 0, pc = (f * 100).toFixed(2) + '%';
         $('.np-line i').style.width = pc;
-        if (document.activeElement !== $('.np-pos')) { $('.np-pos').value = Math.round(f * 1000); $('.np-cur').textContent = fmt(pos); }
+        if (!seeking) { $('.np-pos').value = Math.round(f * 1000); $('.np-cur').textContent = fmt(pos); }
         if (djOpen) { djQ('.dj-bar i').style.width = pc; djQ('.dj-cur').textContent = fmt(pos); }
       }
     }
@@ -544,19 +554,16 @@ window.NowPlaying = (function () {
       var requestedAt = Date.now();
       call('GET', '/me/player?additional_types=episode').then(function (j) {
         if (busy || requestedAt < lastAction || Date.now() < hold) return;   // a control was just pressed: let its result settle first
-        var was = S && S.item && S.is_playing && j && j.item && j.is_playing && S.item.id === j.item.id ? S.progress_ms + (Date.now() - at) : null;
         var raw = j && j.item ? j.item.id + '@' + j.progress_ms : null, stale = raw && raw === lastRaw;
         lastRaw = raw;
-        S = j; at = Date.now();
         // Spotify's position can be behind. A device that has stopped reporting (the Web Player in a background browser tab)
         // leaves Spotify repeating the very same position while "playing": that answer says nothing new, so the clock keeps
         // counting. And an answer a few seconds old (or a shared one, up to 2.5 s old) would make the time jump back and
         // forward again: a step back on one answer is lag and the clock keeps counting; if the next answer says the same,
         // it was a real rewind (from another device) and it is taken.
-        var back = was == null ? 0 : was - j.progress_ms, dur = j.item && j.item.duration_ms || Infinity;
-        if (was != null && stale) { S.progress_ms = Math.min(was, dur); lagged = false; }
-        else if (back > 0 && back < 12000 && !(back > 1500 && lagged)) { S.progress_ms = Math.min(was, dur); lagged = back > 1500; }
-        else lagged = false;
+        var timing = PlaybackClock.reconcile(S, at, j, Date.now(), stale, lagged);
+        S = j; at = Date.now(); lagged = timing.lagged;
+        if (S && S.item) S.progress_ms = timing.progress;
         if (j && j.device && j.device.id && (j.device.id === (selectedDevice && selectedDevice.id) || Date.now() >= deviceSettlesAt)) selectedDevice = null;
         if (j && j.item && j.is_playing) lastPlay = Date.now();
         setStatus(j && j.item ? (j.is_playing ? 'playing' : 'paused') : 'idle');
@@ -684,10 +691,13 @@ window.NowPlaying = (function () {
       });
     }
     $('.np-pos').addEventListener('change', function () {
+      seeking = false;
       if (!S || !S.item) return; var ms = Math.round(this.value / 1000 * S.item.duration_ms);
       ctl('PUT', '/me/player/seek?position_ms=' + ms, function () { S.progress_ms = ms; at = Date.now(); });
     });
-    $('.np-pos').addEventListener('input', function () { if (S && S.item) $('.np-cur').textContent = fmt(this.value / 1000 * S.item.duration_ms); });
+    $('.np-pos').addEventListener('input', function () { seeking = true; if (S && S.item) $('.np-cur').textContent = fmt(this.value / 1000 * S.item.duration_ms); });
+    $('.np-pos').addEventListener('blur', function () { seeking = false; });
+    $('.np-pos').addEventListener('pointercancel', function () { seeking = false; });
     $('.np-shuf').addEventListener('click', function () { if (S) ctl('PUT', '/me/player/shuffle?state=' + !S.shuffle_state, function () { S.shuffle_state = !S.shuffle_state; }); });
     $('.np-rep').addEventListener('click', function () {
       if (!S) return; var nx = { off: 'context', context: 'track', track: 'off' }[S.repeat_state] || 'off';
@@ -1406,6 +1416,7 @@ window.NowPlaying = (function () {
     window.addEventListener('resize', function () { $('.np-t').classList.remove('mq'); fitTitle(); });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { $('.np-t').classList.remove('mq'); fitTitle(); });
 
+    if (opts.app) setIdle(tok ? 'nothing' : 'connect');
     ready.then(function () { setStatus(tok ? 'idle' : 'off'); poll(); });
     var volT = 0;
     return {
@@ -1459,7 +1470,7 @@ window.NowPlaying = (function () {
       signedIn: function () { return !!(load() && load().refresh); },
       spotifyTrack: function () { return currentTrack(); },
       ytTrack: function () { return yt ? yt.track() : null; },
-      _state: function (s) { S = s; at = Date.now(); if (s && s.item) { lastPlay = Date.now(); paint(); show(); } else hide(); }   // for testing
+      _state: function (s) { S = s; at = Date.now(); setIdle(s && s.item ? null : 'nothing'); if (s && s.item) { lastPlay = Date.now(); paint(); show(); } else emitTrack(); }   // for testing
     };
   }
 

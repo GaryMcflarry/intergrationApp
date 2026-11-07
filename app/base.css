@@ -1,0 +1,31 @@
+/* Base appearance: a continuous black island with compact media controls. */
+html:not(.glass) body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+html:not(.glass) #isl { background: #050505; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 10px 28px rgba(0,0,0,.24); }
+html:not(.glass) #isl[data-l="3"] { background: rgb(5 5 11 / var(--full-opacity)); box-shadow: none; }
+html:not(.glass) .tabs button { border-radius: 15px; font-weight: 600; padding: 7px 9px; }
+html:not(.glass) .tabs button[aria-selected="true"] { background: #232325; }
+html:not(.glass) .hb button { border-radius: 50%; }
+html:not(.glass) .ask form { background: #19191c; box-shadow: none; border-radius: 17px; }
+html:not(.glass) .ask kbd { background: #303033; }
+html:not(.glass) .art { border-radius: 15px; box-shadow: none; }
+html:not(.glass) .pill .ic img { width: 22px; height: 22px; border-radius: 8px; object-fit: cover; }
+html:not(.glass) .nt b { font-weight: 600; font-size: 15px; }
+html:not(.glass) .nbar { height: 4px; background: #363639; }
+html:not(.glass) .nbar i { background: #e8e8eb; box-shadow: none; }
+html:not(.glass) .ctl { margin-top: 12px; }
+html:not(.glass) .ctl .c-play { background: transparent; color: #fff; }
+html:not(.glass) .ctl button svg { width: 22px; height: 22px; }
+html:not(.glass) .go { background: #222225; box-shadow: none; border-radius: 17px; text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 12px; }
+html:not(.glass) .go:hover { background: #35353a; }
+html:not(.glass) .np.in-app { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+html:not(.glass) .np.in-app .np-art { border-radius: 15px; box-shadow: none; }
+html:not(.glass) .np.in-app .np-btns button { color: #f5f5f7; }
+html:not(.glass) .np.in-app .np-btns .np-play { background: transparent; box-shadow: none; }
+html:not(.glass) .np.in-app .np-line i { background: #e7e7ea; box-shadow: none; }
+html:not(.glass) .np.in-app .np-item { border-radius: 16px; }
+html:not(.glass) .np.in-app .np-item:hover { background: #1c1c20; }
+html:not(.glass) .grp { background: #171719; border-radius: 19px; box-shadow: none; }
+html:not(.glass) .tile { background: #202023; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); border-radius: 20px; }
+html:not(.glass) .card { background: #080809; backdrop-filter: none; border-radius: 25px; }
+html:not(.glass) .chips button { border-radius: 16px; }
+body.moving #isl { border-radius: 18px; }

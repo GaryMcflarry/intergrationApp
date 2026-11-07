@@ -9,6 +9,7 @@ const server = require('./lib/server');
 const { createStore } = require('./lib/store');
 const discord = require('./lib/discord');
 const { createBot } = require('./lib/discordbot');
+const { createSocial } = require('./lib/discord-social');
 const { createSpotifyAuth } = require('./lib/spotify-auth');
 const { createApi } = require('./lib/api');
 const ICON = require('./lib/icon');
@@ -33,6 +34,7 @@ const MAC = process.platform === 'darwin';
 // Menu bar mode (Top bar mode on Windows): the island flush at the very top of a screen (ASTRUM_NOTCH=1 tries it on Linux)
 const NOTCH_OK = MAC || process.platform === 'win32' || process.env.ASTRUM_NOTCH === '1';
 let island = null, tray = null, store = null, presence = null, bot = null, quitting = false, full = null, lastStatus = { text: 'Starting…', ok: false };
+let social = null;
 
 function sendAll(channel, payload) { for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload); }
 
@@ -95,8 +97,8 @@ function placeIsland() {
 }
 function setClickThrough(on) { if (island && CLICK_THROUGH) island.setIgnoreMouseEvents(!!on, { forward: true }); }
 // a drop: the anchor moves by as much as the window was dragged (snapped to an edge or the middle, lib/placement.js), kept for next time
-function setAnchorFromDrag(start) {
-  const b = island.getBounds(), from = place.anchorAt(screen.getAllDisplays(), screen.getPrimaryDisplay(), anchor);
+function setAnchorFromDrag(start, origin) {
+  const b = island.getBounds(), from = origin || place.anchorAt(screen.getAllDisplays(), screen.getPrimaryDisplay(), anchor);
   anchor = place.anchorFromPoint(screen.getAllDisplays(), { x: from.x + b.x - start.x, y: from.y + b.y - start.y }, store.settings().placement);
   store.setSettings({ bounds: anchor });
 }
@@ -142,11 +144,13 @@ function dragIsland(phase, box) {
   if (phase === 'start' && !full && !drag && store.settings().placement !== 'notch') {   // Menu bar mode stays on the notch
     const c = screen.getCursorScreenPoint();
     let b = island.getBounds();
+    let origin = null;
     /* the overlay is a big window: carrying all of it is slow (and macOS stops a tall window at the top of the screen),
        so for the drag the window shrinks to the island itself, and goes back to the overlay when it is let go */
     const ok = (v) => Number.isFinite(v) && v >= -4000 && v <= 8000;
     if (OVERLAY && box && ok(box.x) && ok(box.y) && ok(box.w) && ok(box.h) && box.w > 0 && box.h > 0) {
-      const nb = { x: Math.round(b.x + box.x - DRAG_PAD), y: Math.round(b.y + box.y - DRAG_PAD),
+      origin = { x: c.x, y: c.y };
+      const nb = { x: Math.round(c.x - box.w / 2 - DRAG_PAD), y: Math.round(c.y - box.h / 2 - DRAG_PAD),
         width: Math.round(Math.min(b.width, box.w) + DRAG_PAD * 2), height: Math.round(Math.min(b.height, box.h) + DRAG_PAD * 2) };
       lastPlace = '';   // the overlay's place is sent again on the drop
       island.webContents.send('island-place', { drag: true, x: DRAG_PAD, y: DRAG_PAD });
@@ -155,14 +159,14 @@ function dragIsland(phase, box) {
     // the window follows the mouse, keeping its size: moved between screens of different scaling, Windows would
     // otherwise resize it on the way (and the island would jump away from the mouse)
     setClickThrough(false);
-    drag = { start: { x: b.x, y: b.y }, dx: c.x - b.x, dy: c.y - b.y, w: b.width, h: b.height, timer: setInterval(() => {
+    drag = { start: { x: b.x, y: b.y }, origin, dx: c.x - b.x, dy: c.y - b.y, w: b.width, h: b.height, timer: setInterval(() => {
       if (!island) return; const p = screen.getCursorScreenPoint();
       island.setBounds({ x: p.x - drag.dx, y: p.y - drag.dy, width: drag.w, height: drag.h });
     }, 16) };
   } else if (phase === 'end' && drag) {   // let go: it stays there, on that screen
-    const start = drag.start;
+    const start = drag.start, origin = drag.origin;
     stopDrag();
-    setAnchorFromDrag(start);
+    setAnchorFromDrag(start, origin);
     placeIsland();
   }
 }
@@ -234,7 +238,7 @@ function buildTray() {
 function applySettings(patch) {
   const before = store.settings(), now = store.setSettings(patch);
   if ('openAtLogin' in patch) { try { app.setLoginItemSettings({ openAtLogin: !!now.openAtLogin }); } catch { /* not here */ } if (tray) tray.refresh(); }
-  if (now.discordId !== before.discordId) presence.connect(now.discordId);
+  if (now.discordId !== before.discordId) { if (social) social.stop(); presence.connect(now.discordId); }
   if (now.presence !== before.presence) presence.setEnabled(now.presence);
   if ('channels' in patch) bot.refresh().catch(() => {});
   if ('alwaysOnTop' in patch) applyOnTop();
@@ -322,11 +326,24 @@ function wire() {
   ipcMain.handle('discord-status', () => lastStatus);
   ipcMain.handle('discord-feed', () => bot.feed());
   ipcMain.handle('discord-refresh', (e) => (fromApp(e) ? bot.refresh().catch((er) => ({ configured: true, messages: [], channels: [], error: er.message })) : null));
+  ipcMain.handle('discord-social-state', (e) => fromIsland(e) ? social.state() : null);
+  ipcMain.handle('discord-social-connect', (e) => fromIsland(e) ? social.connect() : null);
+  ipcMain.handle('discord-social-disconnect', (e) => fromIsland(e) ? social.stop() : null);
+  ipcMain.handle('discord-social-conversations', (e) => fromIsland(e) ? social.conversations() : null);
+  ipcMain.handle('discord-social-history', (e, id) => fromIsland(e) ? social.openConversation(id) : null);
+  ipcMain.handle('discord-social-send', (e, id, text) => fromIsland(e) ? social.sendMessage(id, text) : { ok: false });
+  ipcMain.handle('discord-social-message-open', (e, id) => { if (fromIsland(e)) social.openMessage(id); });
+  ipcMain.handle('discord-social-voice', (e, action, value) => fromIsland(e) ? social.voice(action, value) : null);
 }
 
 app.whenReady().then(async () => {
   store = createStore(app.getPath('userData'));
   presence = discord.createPresence({ onStatus: (st) => { lastStatus = st; sendAll('discord-status', st); } });
+  social = createSocial({
+    executable: process.platform === 'win32' ? path.join(app.isPackaged ? process.resourcesPath : path.join(__dirname, 'dist'), 'discord-social', 'astrum-discord-social.exe') : null,
+    getClientId: () => store.settings().discordId,
+    onState: (state) => { if (island && !island.isDestroyed()) island.webContents.send('discord-social-state', state); }
+  });
   bot = createBot({ getToken: getBotToken, getChannels: () => store.settings().channels, onFeed: (f) => sendAll('discord-feed', f) });
   const spotifyAuth = createSpotifyAuth({
     getClientId: () => store.get('np-client'), redirectUri: ORIGIN + '/spotify/callback',
@@ -359,5 +376,5 @@ app.whenReady().then(async () => {
 });
 app.on('second-instance', () => { if (island) { island.showInactive(); island.webContents.send('island-poke'); } });
 app.on('will-quit', () => globalShortcut.unregisterAll());
-app.on('before-quit', () => { quitting = true; if (store) store.flush(); if (presence) presence.stop(); if (bot) bot.stop(); });
+app.on('before-quit', () => { quitting = true; if (social) social.stop(); if (store) store.flush(); if (presence) presence.stop(); if (bot) bot.stop(); });
 app.on('window-all-closed', () => { /* stays in the tray */ });

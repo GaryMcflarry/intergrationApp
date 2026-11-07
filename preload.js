@@ -5,6 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 const on = {};
 function listen(channel) { on[channel] = []; ipcRenderer.on(channel, (_e, d) => on[channel].forEach((f) => f(d))); return (f) => { on[channel].push(f); }; }
 const onKv = listen('kv-changed'), onSettings = listen('settings'), onStatus = listen('discord-status'), onFeed = listen('discord-feed');
+const onSocial = listen('discord-social-state');
 const onReflow = listen('island-reflow'), onPoke = listen('island-poke'), onPlace = listen('island-place'), onSummon = listen('island-summon'), onMedia = listen('island-media');
 
 contextBridge.exposeInMainWorld('desktop', {
@@ -36,6 +37,17 @@ contextBridge.exposeInMainWorld('desktop', {
   openGuide: (what) => ipcRenderer.send('open-guide', String(what || 'index')),
   window: { openSetup: (url) => ipcRenderer.send('open-guide', String(url)) },   // the player's set-up links: their guide, in the browser
   discord: {
+    social: {
+      state: () => ipcRenderer.invoke('discord-social-state'),
+      connect: () => ipcRenderer.invoke('discord-social-connect'),
+      disconnect: () => ipcRenderer.invoke('discord-social-disconnect'),
+      conversations: () => ipcRenderer.invoke('discord-social-conversations'),
+      history: (id) => ipcRenderer.invoke('discord-social-history', id),
+      send: (id, text) => ipcRenderer.invoke('discord-social-send', id, text),
+      openMessage: (id) => ipcRenderer.invoke('discord-social-message-open', id),
+      voice: (action, value) => ipcRenderer.invoke('discord-social-voice', action, value),
+      onState: onSocial
+    },
     update: (track) => ipcRenderer.send('discord-update', track || null),
     share: (track) => ipcRenderer.invoke('discord-share', track),
     status: () => ipcRenderer.invoke('discord-status'),
