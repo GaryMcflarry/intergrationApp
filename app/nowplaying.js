@@ -177,9 +177,11 @@ window.NowPlaying = (function () {
     '.np-yt{display:none}.np.src-yt .np-yt{display:block}.np.src-yt .np-sp{display:none}.np.src-yt{--np-acc:#ff4e45!important}',
     '.np.src-yt.np-idle{cursor:default}.np.src-yt.np-idle .np-yt .np-btns{display:flex}.np.src-yt.np-idle .np-yt .np-line{display:block}.np.src-yt.np-idle .np-yt .np-more{display:grid}.np.src-yt.np-idle .np-yt .np-art{opacity:1}',
     '.np.big .np-yt .np-line{display:none}',
-    '.yt-vid{aspect-ratio:16/9;background:#111 center/cover}.yt-vid iframe,.yt-vid>div{position:absolute;inset:0;width:100%;height:100%;border:0}',
-    '.yt-ph{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px;color:var(--np-ink2);font-size:12px;background:radial-gradient(80% 80% at 50% 40%,rgba(255,78,69,.28),#0b0a12)}',
-    '.yt-ph svg{width:34px;height:34px;fill:none;stroke:currentColor;color:var(--np-hi);margin:0 auto 6px;display:block}.yt-ph em{font-style:normal}',
+    '/* YouTube plays in your browser: the cover, and the steps to connect it */',
+    '.yt-cover{aspect-ratio:16/9;object-fit:cover}',
+    '.yt-connect{display:grid;gap:8px;padding:12px 14px;border-radius:14px;font-size:12px;color:var(--np-ink2);background:radial-gradient(90% 120% at 0 0,rgba(255,78,69,.18),rgba(255,255,255,.04))}',
+    '.yt-connect[hidden]{display:none}.yt-connect b{color:#fff;font-size:13px}.yt-connect ol{margin:0;padding-left:18px;display:grid;gap:4px}.yt-connect em{font-style:normal;color:#fff}',
+    '.np-yt .np-item[aria-current=true] b{color:var(--np-hi)}',
     '.np .np-acts button[hidden]{display:none}',
     '.np-dj .dj-go{width:auto;height:auto;border-radius:999px;padding:9px 14px;gap:6px;display:inline-flex;align-items:center;font-size:11px;font-weight:700;letter-spacing:.14em;background:rgba(10,10,20,.5);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}',
     '.np-dj .dj-go svg{width:16px;height:16px;fill:none}.np-dj:not(.m-now) .dj-go{display:none}.np-dj:not(.m-dj) .dj-vibe2{display:none}',
@@ -189,11 +191,8 @@ window.NowPlaying = (function () {
     '/* the desktop app: the player is the widget */',
     '.np.in-app.np-idle{cursor:default}.np.in-app.np-idle .np-btns{display:flex}.np.in-app.big.np-idle .np-more{display:grid}',
     '/* YouTube in the full view: the player card is hidden except its video, which moves to where the cover goes */',
-    '.np-dj.m-yt{z-index:19}.np-dj.m-yt .dj-cover{visibility:hidden;aspect-ratio:16/9;height:auto;width:min(58vw,720px,calc((100vh - 280px) * 16 / 9))}',
+    '.np-dj.m-yt{z-index:19}.np-dj.m-yt .dj-cover{aspect-ratio:16/9;height:auto;width:min(58vw,720px,calc((100vh - 280px) * 16 / 9))}',
     '.np.yt-full{visibility:hidden;opacity:1!important;transform:none!important;transition:none}',
-    '.np.yt-full .np-card,.np.yt-full .np-in{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;clip-path:none!important;overflow:visible}',
-    '.np.yt-full .np-yt .np-more{opacity:1;overflow:visible}.np.yt-full .np-yt .np-pane[data-pane=now]{display:grid}',
-    '.np.yt-full .yt-vid{visibility:visible;position:fixed!important;z-index:5;border-radius:22px;box-shadow:0 30px 80px rgba(0,0,0,.55)}',
     '.np.dj-hide{opacity:0!important;pointer-events:none!important}',
     '/* DJ mode: the whole page, with the wallpaper still showing through */',
     '.np-dj{position:fixed;inset:0;z-index:30;display:grid;grid-template-rows:auto 1fr auto;gap:12px;padding:max(18px,env(safe-area-inset-top)) clamp(16px,4vw,48px) max(18px,env(safe-area-inset-bottom));color:#f5f3ff;font:500 14px/1.4 "Chakra Petch","Trebuchet MS",system-ui,sans-serif;--np-acc:#1ed760;--np-hi:color-mix(in srgb,var(--np-acc) 50%,#fff);background:linear-gradient(transparent 62%,rgba(4,4,12,.86)),radial-gradient(120% 90% at 50% 50%,rgba(4,4,12,.18),rgba(4,4,12,.62));opacity:0;pointer-events:none;transition:opacity .6s ease;overflow:hidden}',
@@ -204,7 +203,6 @@ window.NowPlaying = (function () {
     '.np-dj button:hover{background:rgba(255,255,255,.14)}.np-dj button:active{transform:scale(.92)}.np-dj button:focus-visible{outline:2px solid var(--np-acc);outline-offset:2px}',
     '.np-dj button svg{width:22px;height:22px;fill:currentColor}',
     '.dj-top{display:flex;align-items:center;gap:12px;min-width:0}',
-    '.dj-yt-grab{display:none}',
     '.dj-tag{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;padding:7px 12px;border-radius:999px;background:rgba(10,10,20,.5);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}',
     '.dj-tag i{width:8px;height:8px;border-radius:50%;background:var(--np-acc);box-shadow:0 0 10px var(--np-acc)}.np-dj.playing .dj-tag i{animation:dj-pulse 1.6s ease-in-out infinite}',
     '@keyframes dj-pulse{50%{transform:scale(.55);opacity:.6}}',
@@ -646,7 +644,6 @@ window.NowPlaying = (function () {
         setBig: function (b) { setBig(b); }, isBig: function () { return box.classList.contains('big'); },
         toggleWide: function () { setWide(!box.classList.contains('wide'), true); }, isWide: function () { return box.classList.contains('wide'); },
         pauseOther: function () { if (S && S.is_playing) ctl('PUT', '/me/player/pause', function () { S.progress_ms += Date.now() - at; at = Date.now(); S.is_playing = false; }); },   // YouTube started: Spotify pauses
-        canPip: false, pipHost: null,
         openFull: function () { setView('yt'); }, closeFull: function () { if (view === 'yt') setView(null, true); }, onChange: function () { if (view === 'yt') djPaint(); }
       });
       box.querySelector('.np-srctabs').hidden = false;
@@ -1147,8 +1144,7 @@ window.NowPlaying = (function () {
       '<button type="button" class="dj-play" aria-label="Play">' + ICON.play + '</button><button type="button" class="dj-next" aria-label="Next">' + ICON.next + '</button>' +
       '<button type="button" class="dj-save" aria-label="Add to a playlist" title="Add to a playlist">' + ICON.save + '</button></div><p class="dj-toast" aria-live="polite"></p></div></div>' +
       '<div class="dj-bot"><div class="dj-vibe2"><select class="np-sel dj-g" aria-label="Genre"></select><select class="np-sel dj-e" aria-label="Era"></select>' +
-      '<form class="np-gform dj-f"><input type="search" class="np-q" placeholder="Type a genre…" aria-label="Type a genre for the DJ" autocomplete="off" spellcheck="false"><button type="submit">Play</button></form></div><div class="dj-upnext"><span>Up next</span><ul></ul></div></div>' +
-      (opts.app ? '<div class="dj-yt-grab" title="Drag up to return to the tablet" aria-hidden="true"></div>' : '');
+      '<form class="np-gform dj-f"><input type="search" class="np-q" placeholder="Type a genre…" aria-label="Type a genre for the DJ" autocomplete="off" spellcheck="false"><button type="submit">Play</button></form></div><div class="dj-upnext"><span>Up next</span><ul></ul></div></div>';
     document.body.appendChild(djEl);
     function djQ(c) { return djEl.querySelector(c); }
     var djOpen = false, djArt = '', djFetching = false, djStartPending = false, djRefillAt = 0, djLastId = null, toastT = 0, view = null, nowFrom = '', nextFor = null;
@@ -1199,28 +1195,17 @@ window.NowPlaying = (function () {
         call('GET', '/me/player/queue').then(function (j) { if (!nextFor || nextFor.id !== it.id) return; nextFor.list = (j && j.queue || []).slice(0, 3).filter(Boolean).map(djEntry); djPaint(); }, function () { });
       }
     }
-    // YouTube in the full view: its video sits where the cover goes (YouTube asks that its player stays visible)
+    // YouTube in the full view: the video's picture as the cover (the video itself plays in your browser)
     function ytPaint() {
       var d = yt.info();
-      if (opts.app) {
-        box.classList.toggle('yt-frame', !d.error && !!yt.vidEl.querySelector('iframe'));
-        djQ('.dj-vibe').textContent = d.title;
-      }
       djEl.classList.toggle('playing', d.playing);
       var p = djQ('.dj-play'); p.innerHTML = d.playing ? ICON.pause : ICON.play; p.setAttribute('aria-label', d.playing ? 'Pause' : 'Play');
       djQ('.dj-t').textContent = d.title || 'YouTube'; djQ('.dj-a').textContent = d.error || d.author || 'Pick a video, mix or playlist';
       djQ('.dj-line').textContent = 'YouTube';
-      var g = d.vid && !opts.app ? 'https://i.ytimg.com/vi/' + encodeURIComponent(d.vid) + '/hqdefault.jpg' : '';
-      if (g !== djArt) { djArt = g; if (g) djQ('.dj-glow').src = g; else djQ('.dj-glow').removeAttribute('src'); }
-      djQ('.dj-upnext').hidden = true; placeVid();
+      var g = d.vid ? 'https://i.ytimg.com/vi/' + encodeURIComponent(d.vid) + '/hqdefault.jpg' : '';
+      if (g !== djArt) { djArt = g; ['.dj-cover', '.dj-glow'].forEach(function (c) { if (g) djQ(c).src = g; else djQ(c).removeAttribute('src'); }); }
+      djQ('.dj-upnext').hidden = true;
     }
-    function placeVid() {
-      if (opts.app) return;
-      var v = yt && yt.vidEl; if (!v) return;
-      if (view !== 'yt') { v.style.left = v.style.top = v.style.width = v.style.height = ''; return; }
-      var r = djQ('.dj-cover').getBoundingClientRect(); v.style.left = r.left + 'px'; v.style.top = r.top + 'px'; v.style.width = r.width + 'px'; v.style.height = r.height + 'px';
-    }
-    window.addEventListener('resize', function () { if (view === 'yt') placeVid(); });
     setInterval(function () { if (view !== 'yt' || !yt) return; var d = yt.info(); djQ('.dj-bar i').style.width = d.dur ? Math.min(100, d.cur / d.dur * 100).toFixed(2) + '%' : '0'; djQ('.dj-cur').textContent = fmt(d.cur * 1000); djQ('.dj-dur').textContent = fmt(d.dur * 1000); }, 500);
     function djEntry(t) { return { u: t.uri, t: t.name, a: names(t.artists), i: pic(t.album && t.album.images), r: reason }; }
     // only one page tops the queue up at a time (the rotation briefly has two wallpapers open while it crossfades)
@@ -1283,7 +1268,6 @@ window.NowPlaying = (function () {
       box.classList.toggle('yt-full', v === 'yt');
       window.dispatchEvent(new CustomEvent('np:view', { detail: { view: v, returnExpanded: returnExpanded } }));
       if (v) { setBig(false); djLastId = null; djArt = ''; nextFor = null; if (v === 'dj') djChips(); else djQ('.dj-vibe').textContent = v === 'now' && nowFrom ? nowFrom : ''; if (v !== 'yt') checkLiked(); djPaint(); wake(); }
-      requestAnimationFrame(placeVid);
     }
     function setDj(open) { setView(open ? 'dj' : null); }
     function openNow(label) { nowFrom = label || ''; setView('now'); }
@@ -1296,15 +1280,6 @@ window.NowPlaying = (function () {
     djQ('.dj-go').addEventListener('click', function () { djEnter(true); });
     $('.np-art').addEventListener('click', function () { if (S && S.item && !idleMode) openNow(); });   // the cover opens the full view
     djQ('.dj-x').addEventListener('click', djLeave);
-    if (opts.app) {
-      var ytGrab = djQ('.dj-yt-grab'), grabY = null;
-      ytGrab.addEventListener('pointerdown', function (e) {
-        if (view !== 'yt' || e.button !== 0) return;
-        grabY = e.clientY; ytGrab.setPointerCapture(e.pointerId);
-      });
-      ytGrab.addEventListener('pointermove', function (e) { if (grabY != null && grabY - e.clientY >= 28) { grabY = null; djLeave(); } });
-      ytGrab.addEventListener('lostpointercapture', function () { grabY = null; });
-    }
     (function () {   // the card follows the mouse
       var card = djQ('.dj-card'), still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       card.addEventListener('pointermove', function (e) {

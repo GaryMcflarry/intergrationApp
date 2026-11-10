@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Astrum for YouTube</title>
+  <style>
+    body { width: 280px; margin: 0; padding: 14px; font: 13px/1.4 system-ui, sans-serif; color: #f5f3ff; background: #0e0c18; }
+    h1 { margin: 0 0 4px; font-size: 14px; }
+    p { margin: 0 0 10px; color: rgba(245, 243, 255, .7); font-size: 12px; }
+    form { display: flex; gap: 6px; }
+    input { flex: 1; min-width: 0; padding: 7px 8px; border: 0; border-radius: 8px; font: 12px ui-monospace, monospace; color: inherit; background: rgba(255, 255, 255, .08); }
+    button { padding: 7px 10px; border: 0; border-radius: 8px; font: inherit; font-size: 12px; color: #111; background: #f5f3ff; cursor: pointer; }
+    .st { margin: 10px 0 0; font-size: 12px; }
+    .st.ok { color: #7ee0a1; }
+    .st.bad { color: #ffb4a8; }
+  </style>
+</head>
+<body>
+  <h1>Astrum for YouTube</h1>
+  <p>In Astrum, open the YouTube tab and press <b>Copy pairing code</b>, then paste it here.</p>
+  <form>
+    <input type="password" name="code" placeholder="Pairing code" aria-label="Pairing code" autocomplete="off" spellcheck="false">
+    <button type="submit">Save</button>
+  </form>
+  <p class="st" role="status"></p>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -12,10 +12,19 @@
 <body style="--acc:#ff8a84">
 <main>
   <header class="top"><span class="logo" id="logo"></span><h1><small>Astrum · set up</small>YouTube</h1></header>
-  <p class="lead">Watch videos and play music in the island. Paste a YouTube video link in <b>Search</b> to play it without signing in. Connect a Google app to search, see popular videos, and browse <b>your playlists and liked videos</b> with read-only access.</p>
+  <p class="lead">YouTube plays in your browser, and the island shows what plays, its queue and YouTube's suggestions, and controls it, like Spotify. Connect your browser first; a Google app (optional) adds search and <b>your playlists and liked videos</b>, with read-only access.</p>
 
   <section class="card">
-    <h2>1 · Make a Google app</h2>
+    <h2>1 · Connect your browser</h2>
+    <ol>
+      <li>In Chrome, Edge or Brave, open the extensions page (<span class="mono">chrome://extensions</span>), turn on <b>Developer mode</b>, press <b>Load unpacked</b> and choose the <b>extension/youtube</b> folder in Astrum's folder.</li>
+      <li>In Astrum, open the YouTube tab and press <b>Copy pairing code</b>. Paste it into the extension's popup (its icon in the toolbar) and press <b>Save</b>.</li>
+      <li>Play something on youtube.com (reload tabs that were already open). It shows up in the island.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>2 · Make a Google app (optional)</h2>
     <ol>
       <li>Open the <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">Google Cloud console</a> and create a project (any name).</li>
       <li>In <b>APIs &amp; Services → Library</b>, find <b>YouTube Data API v3</b> and press <b>Enable</b>.</li>
@@ -25,7 +34,7 @@
   </section>
 
   <section class="card">
-    <h2>2 · Sign in <span class="st" id="st">…</span></h2>
+    <h2>3 · Sign in <span class="st" id="st">…</span></h2>
     <label class="f">Client ID<input type="text" id="cid" spellcheck="false" autocomplete="off" placeholder="…apps.googleusercontent.com"></label>
     <div class="row"><button type="button" class="go" id="connect">Sign in with Google</button><button type="button" id="out" hidden>Remove my library</button></div>
     <p class="msg" id="msg" aria-live="polite"></p>
