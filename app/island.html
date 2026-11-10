@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="fonts/fonts.css">
 <style>
 /* Astrum: a compact black island at the top of the screen that grows in four steps.
-   0 pill (what plays, or Discord) · 1 peek (three tabs and what plays) · 2 expanded (the full player, Discord's
+   0 pill (what plays, or Discord) · 1 peek (four tabs: what plays, Discord, AI usage) · 2 expanded (the full player, Discord's
    channels, or the settings) · 3 the whole screen. Hover or click opens it, dragging down opens it further, dragging up / Esc closes.
    The desktop window fits the active panel. */
 @property --acc { syntax: '<color>'; inherits: true; initial-value: #1ed760; }
@@ -457,6 +457,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
       <button type="button" role="tab" data-t="sp" title="Spotify" aria-label="Spotify"><span class="tb ics"></span><span class="tl">Spotify</span></button>
       <button type="button" role="tab" data-t="yt" title="YouTube" aria-label="YouTube"><span class="tb icy"></span><span class="tl">YouTube</span></button>
       <button type="button" role="tab" data-t="dc" title="Discord" aria-label="Discord"><span class="tb icd"><i class="dotn" hidden></i></span><span class="tl">Discord</span></button>
+      <button type="button" role="tab" data-t="ai" title="AI usage" aria-label="AI usage"><span class="tb ica"></span><span class="tl">AI</span></button>
     </div>
     <div class="hb">
       <button type="button" class="h-more" title="Expand" aria-label="Expand" aria-expanded="false"></button>
@@ -473,6 +474,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     <div class="dc-server-feed" hidden><div class="chips"></div><ul class="msgs"></ul></div>
     <div class="dcfoot"><span class="dcst"></span><span><button type="button" class="dc-refresh">Refresh</button> · <button type="button" class="dc-setup">Set up ↗</button></span></div>
   </div>
+  <div class="lv aip"></div>
   <div class="lv setp">
     <div class="set-scroll"><div class="set-in">
       <section class="s-ctrls" hidden>
@@ -551,6 +553,8 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
 <script src="astrum.js"></script>
 <link rel="stylesheet" href="discord-panel.css">
 <script src="discord-panel.js"></script>
+<link rel="stylesheet" href="ai-panel.css">
+<script src="ai-panel.js"></script>
 <script>
 (function () {
   'use strict';
@@ -592,9 +596,10 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     spark: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.9 6.1 6.1 1.9-6.1 1.9L12 18.5l-1.9-6.1-6.1-1.9 6.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" opacity=".7"/></svg>',
     vol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
     dcw: '<svg viewBox="0 0 24 24"><path d="M7.3 6.6c1.5-.6 3-.9 4.7-.9s3.2.3 4.7.9c1.5 2.1 2.2 4.5 2.1 7.1-1.4 1.1-2.9 1.8-4.5 2.1l-.9-1.4c.7-.3 1.4-.6 2-1-2.5 1.1-4.7 1.1-6.8 0 .6.4 1.3.7 2 1l-.9 1.4c-1.6-.3-3.1-1-4.5-2.1-.1-2.6.6-5 2.1-7.1z" fill="#fff"/><circle cx="9.6" cy="11.4" r="1.2" fill="#5865f2"/><circle cx="14.4" cy="11.4" r="1.2" fill="#5865f2"/></svg>',
+    ai: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4.5-5"/><circle cx="12" cy="17" r="1.2" fill="currentColor"/></svg>',
     ext: '<svg viewBox="0 0 24 24" width="13" height="13"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   };
-  $('.ics').innerHTML = IC.sp; $('.icy').innerHTML = IC.yt; $('.icd').insertAdjacentHTML('afterbegin', IC.dc);
+  $('.ics').innerHTML = IC.sp; $('.icy').innerHTML = IC.yt; $('.icd').insertAdjacentHTML('afterbegin', IC.dc); $('.ica').innerHTML = IC.ai;
   $('.h-set').innerHTML = IC.set; $('.h-more').innerHTML = IC.more; $('.h-full').innerHTML = IC.full; $('.h-up').innerHTML = IC.up;
 
   /* ---------- Astrum: the idle dots, the optional backdrop, the settings ---------- */
@@ -604,7 +609,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
 
   /* ---------- state ---------- */
   var level = 0, tab = 'sp', sticky = false, panel = null;
-  try { var keptTab = localStorage.getItem('ia-tab'); if (keptTab === 'sp' || keptTab === 'yt' || keptTab === 'dc') tab = keptTab; } catch (e) { }   // the tab you had open last
+  try { var keptTab = localStorage.getItem('ia-tab'); if (keptTab === 'sp' || keptTab === 'yt' || keptTab === 'dc' || keptTab === 'ai') tab = keptTab; } catch (e) { }   // the tab you had open last
   function setTab(t) { tab = t; try { localStorage.setItem('ia-tab', t); } catch (e) { } paintPill(); }
   var music = { spotify: null, youtube: null }, lead = null, feed = { configured: false, messages: [], channels: [] }, dcStatus = { text: '', ok: false }, dcChan = 'all';
   var dcSocial = { phase: 'disconnected', friends: [], error: '' };
@@ -777,6 +782,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   }
   function paintPeek() {
     var p = $('.peek'); p.textContent = ''; askHint();
+    if (tab === 'ai') { if (aiPanel) aiPanel.peek(p); else p.appendChild(emptyBox('AI usage', 'Open Astrum on your computer to connect Claude and ChatGPT.')); if (level === 1) size(); return; }
     if (askRes && tab !== 'yt') { askRows(p); if (level === 1) size(); return; }
     if (tab === 'dc') { paintPeekDiscord(p); if (level === 1) size(); return; }
     paintPeekMusic(p); if (level === 1) size();
@@ -852,6 +858,12 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   }
   $('.dc-refresh').addEventListener('click', function () { if (D) D.discord.refresh(); });
   var discordPanel = D && D.discord.social ? DiscordPanel.mount($('.dc-personal'), D.discord.social) : null;
+  /* ---------- AI usage: Claude and ChatGPT limits (peek rows, and the account cards when expanded) ---------- */
+  var aiPanel = D && D.ai ? AiPanel.mount($('.aip'), D.ai, {
+    expand: function () { sticky = true; go(2); },
+    onChange: function () { if (tab === 'ai' && level === 1) paintPeek(); }
+  }) : null;
+  if (aiPanel) new ResizeObserver(function () { if (level === 2 && tab === 'ai' && !setOpen) size(); }).observe($('.aip-in'));
   function discordView(personal) {
     $('.dc-personal').hidden = !personal; $('.dc-server-feed').hidden = personal;
     $('.dc-personal-tab').setAttribute('aria-pressed', String(personal)); $('.dc-server-tab').setAttribute('aria-pressed', String(!personal));
@@ -896,8 +908,10 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   var HEAD = 46, ASK = 44, setOpen = false, curW = 0, curH = 0, shrinkT = 0;
   function target() {
     if (level === 0) return [pillWidth(), 36, 18];
-    if (level === 1) return [tab === 'dc' ? 460 : 440, Math.round(HEAD + (tab === 'dc' ? 0 : ASK) + $('.peek').offsetHeight + 2), 30];
+    var noAsk = tab === 'dc' || tab === 'ai';
+    if (level === 1) return [noAsk ? 460 : 440, Math.round(HEAD + (noAsk ? 0 : ASK) + $('.peek').offsetHeight + 2), 30];
     if (level === 2 && setOpen) return [460, Math.min(window.screen.availHeight - 30, HEAD + $('.set-in').offsetHeight + 24), 28];
+    if (level === 2 && tab === 'ai') return [520, Math.min(window.screen.availHeight - 30, HEAD + $('.aip-in').offsetHeight + 24), 28];
     if (level === 2 && tab !== 'dc') { var r = document.querySelector('.np').getBoundingClientRect(); return [Math.max(440, Math.round(r.width) + 20), Math.round(HEAD + r.height + 14), 28]; }
     if (level === 2) return [560, Math.min(window.screen.availHeight - 30, 620), 28];
     return [window.innerWidth, window.innerHeight, 0];
@@ -946,14 +960,17 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     $('.pill').classList.toggle('on', level === 0);
     $('.head').classList.toggle('on', level >= 1);
     $('.peek').classList.toggle('on', level === 1);
-    $('.ask').classList.toggle('on', level === 1 && tab !== 'dc');
+    $('.ask').classList.toggle('on', level === 1 && tab !== 'dc' && tab !== 'ai');
     if (level !== 1 && askRes) askClear();
     if (level > 0) hideCard();
     $('.dcp').classList.toggle('on', level >= 2 && tab === 'dc' && !setOpen);
     if (discordPanel) { if (level >= 2 && tab === 'dc' && !setOpen && !$('.dc-personal').hidden) discordPanel.show(); else discordPanel.hide(); }
+    var aiOn = level >= 2 && tab === 'ai' && !setOpen;
+    $('.aip').classList.toggle('on', aiOn);
+    if (aiPanel) { if (aiOn) aiPanel.show(); else aiPanel.hide(); }
     $('.setp').classList.toggle('on', setOpen);
     if (setOpen !== watchSys.was) { watchSys.was = setOpen; watchSys(); }
-    var np = level === 2 && tab !== 'dc' && !setOpen;
+    var np = level === 2 && tab !== 'dc' && tab !== 'ai' && !setOpen;
     body.classList.toggle('show-np', np);
     tint(); live();
     api.setPanelActive(level > 0 && tab === 'sp' && !setOpen);
@@ -965,6 +982,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   }
   function go(l) {
     l = Math.max(0, Math.min(3, l));
+    if (l === 3 && tab === 'ai') l = 2;   // AI usage has no whole-screen view
     if (l === 3) {
       if (tab === 'dc') { level = 3; clearTimeout(shrinkT); if (D) D.island.full(true); render(); setTimeout(paintDiscord, 50); return; }
       var t = music[SRC[tab]];
@@ -1002,7 +1020,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
       fullView = null; sticky = true; render();
     }
   });
-  new ResizeObserver(function () { if (level === 2 && tab !== 'dc' && !setOpen) size(); }).observe(document.querySelector('.np'));
+  new ResizeObserver(function () { if (level === 2 && tab !== 'dc' && tab !== 'ai' && !setOpen) size(); }).observe(document.querySelector('.np'));
   new ResizeObserver(function () { if (setOpen) size(); }).observe($('.set-in'));
 
   /* ---------- opening and closing: hover, click, drag, the buttons, Esc, clicking elsewhere ---------- */
@@ -1204,12 +1222,13 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   document.addEventListener('keydown', function (e) {
     if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || level === 3 || editing) return;
     var k = e.key;
-    if (tab !== 'dc' && k === ' ' && !(e.target && e.target.closest && e.target.closest('button'))) { e.preventDefault(); media('play'); }
-    else if (tab !== 'dc' && k === 'ArrowRight') { e.preventDefault(); media('next'); }
-    else if (tab !== 'dc' && k === 'ArrowLeft') { e.preventDefault(); media('prev'); }
-    else if (tab !== 'dc' && (k === 'l' || k === 'L')) media('like');
-    else if (k === '1' || k === '2' || k === '3') { sticky = true; setTab(['sp', 'yt', 'dc'][+k - 1]); panel = null; if (level === 0) go(1); else render(); }
-    else if (k === '/') { e.preventDefault(); sticky = true; if (tab === 'dc') { go(2); $('.dc-personal .ds-filter').focus(); } else { if (level !== 1) go(1); setTimeout(function () { askIn.focus(); }, 60); } }
+    var playing = tab === 'sp' || tab === 'yt';   // the music keys, on the music tabs
+    if (playing && k === ' ' && !(e.target && e.target.closest && e.target.closest('button'))) { e.preventDefault(); media('play'); }
+    else if (playing && k === 'ArrowRight') { e.preventDefault(); media('next'); }
+    else if (playing && k === 'ArrowLeft') { e.preventDefault(); media('prev'); }
+    else if (playing && (k === 'l' || k === 'L')) media('like');
+    else if (k === '1' || k === '2' || k === '3' || k === '4') { sticky = true; setTab(['sp', 'yt', 'dc', 'ai'][+k - 1]); panel = null; if (level === 0) go(1); else render(); }
+    else if (k === '/' && tab !== 'ai') { e.preventDefault(); sticky = true; if (tab === 'dc') { go(2); $('.dc-personal .ds-filter').focus(); } else { if (level !== 1) go(1); setTimeout(function () { askIn.focus(); }, 60); } }
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && editing) { setEditing(false); return; }

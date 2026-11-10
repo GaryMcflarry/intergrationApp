@@ -3,7 +3,7 @@
    - the island: a small pill (what plays, or Discord) that opens into tabs, then the full player, then the whole screen
    - set-up happens in your browser: guide pages served by this app connect each service and hand the result over
    - Discord: Rich Presence follows what plays, a bot of yours brings in the latest messages, Share posts a song */
-const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage, screen, dialog, safeStorage, globalShortcut } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage, screen, dialog, safeStorage, globalShortcut, session } = require('electron');
 const path = require('node:path');
 const server = require('./lib/server');
 const { createStore } = require('./lib/store');
@@ -14,6 +14,7 @@ const { createSpotifyAuth } = require('./lib/spotify-auth');
 const { createApi } = require('./lib/api');
 const ICON = require('./lib/icon');
 const systemControls = require('./lib/system');
+const { createAiUsage, PROVIDERS: AI_PROVIDERS } = require('./lib/ai-usage');
 
 const ORIGIN = `http://127.0.0.1:${server.PORT}`;     // the island, the guides, Spotify's return address
 const GOOGLE = `http://localhost:${server.PORT}`;     // the YouTube guide (Google signs in here)
@@ -34,7 +35,7 @@ const MAC = process.platform === 'darwin';
 // Menu bar mode (Top bar mode on Windows): the island flush at the very top of a screen (ASTRUM_NOTCH=1 tries it on Linux)
 const NOTCH_OK = MAC || process.platform === 'win32' || process.env.ASTRUM_NOTCH === '1';
 let island = null, tray = null, store = null, presence = null, bot = null, quitting = false, full = null, lastStatus = { text: 'Starting…', ok: false };
-let social = null;
+let social = null, aiUsage = null;
 
 function sendAll(channel, payload) { for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload); }
 
@@ -63,6 +64,51 @@ async function setBotToken(token) {
   store.setSettings({ botToken: safeStorage.isEncryptionAvailable() ? 'enc:' + safeStorage.encryptString(token).toString('base64') : 'raw:' + token });
   try { const me = await bot.whoami(); bot.start(); return { ok: true, name: me.username }; }
   catch (e) { store.setSettings({ botToken: before }); return { ok: false, error: e.status === 401 ? 'Discord did not accept that token' : e.message }; }
+}
+
+/* ---------- AI usage: your Claude and ChatGPT sign-ins, each in a session of its own ---------- */
+/* The sites are signed in to in windows of this app (persisted partitions, apart from the island and from each other);
+   lib/ai-usage.js reads the usage with those cookies. The island only ever gets numbers: never a cookie or a token. */
+const AI_PARTS = { claude: 'persist:ai-claude', chatgpt: 'persist:ai-chatgpt' };
+const aiWins = {};
+function aiFetch(provider, url, opts) {
+  return session.fromPartition(AI_PARTS[provider]).fetch(url, { method: 'GET', credentials: 'include', headers: { Accept: 'application/json', ...(opts.headers || {}) } });
+}
+const AI_WEB = { sandbox: true, contextIsolation: true, nodeIntegration: false };
+function aiSignIn(id) {
+  if (!AI_PARTS[id]) return false;
+  const open = aiWins[id];
+  if (open && !open.isDestroyed()) { open.show(); open.focus(); return true; }
+  const w = new BrowserWindow({ width: 480, height: 720, title: 'Sign in to ' + AI_PROVIDERS[id].name, autoHideMenuBar: true,
+    icon: nativeImage.createFromDataURL(ICON), webPreferences: { ...AI_WEB, partition: AI_PARTS[id] } });
+  aiWins[id] = w;
+  // sign-in with Google or Apple opens a popup: it stays in this account's session; anything that is not a web page is refused
+  w.webContents.setWindowOpenHandler(({ url }) => (/^https:\/\//.test(url)
+    ? { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, webPreferences: { ...AI_WEB, partition: AI_PARTS[id] } } }
+    : { action: 'deny' }));
+  w.webContents.on('will-navigate', (e, url) => { if (!/^https:\/\//.test(url)) e.preventDefault(); });
+  // signed in: the site leaves its log-in pages; the usage is read then, and the window closes by itself once it answers
+  let checkT = 0;
+  const check = (_e, url) => {
+    if (/\/(login|auth|log-in|sign-?in)/i.test(String(url))) return;
+    clearTimeout(checkT);
+    checkT = setTimeout(() => aiUsage.refresh(id).then((s) => {
+      const p = s.providers.find((x) => x.provider === id);
+      if (p && p.phase === 'ready' && !w.isDestroyed()) w.close();
+    }), 1500);
+  };
+  w.webContents.on('did-navigate', check);
+  w.webContents.on('did-navigate-in-page', check);
+  w.on('closed', () => { clearTimeout(checkT); if (aiWins[id] !== w) return; aiWins[id] = null; aiUsage.refresh(id); });   // not after a sign-out
+  w.loadURL(AI_PROVIDERS[id].login);
+  return true;
+}
+async function aiSignOut(id) {
+  if (!AI_PARTS[id]) return aiUsage.state();
+  const w = aiWins[id]; aiWins[id] = null; if (w && !w.isDestroyed()) w.destroy();
+  aiUsage.signedOut(id);   // first: a refresh on its way is dropped
+  try { await session.fromPartition(AI_PARTS[id]).clearStorageData(); } catch (e) { console.error('Could not clear the sign-in:', e.message); }
+  return aiUsage.state();
 }
 
 /* ---------- the island window ---------- */
@@ -334,6 +380,12 @@ function wire() {
   ipcMain.handle('discord-social-send', (e, id, text) => fromIsland(e) ? social.sendMessage(id, text) : { ok: false });
   ipcMain.handle('discord-social-message-open', (e, id) => { if (fromIsland(e)) social.openMessage(id); });
   ipcMain.handle('discord-social-voice', (e, action, value) => fromIsland(e) ? social.voice(action, value) : null);
+  // AI usage: the island asks; only numbers come back
+  const aiId = (v) => (typeof v === 'string' && Object.prototype.hasOwnProperty.call(AI_PARTS, v) ? v : null);
+  ipcMain.handle('ai-state', (e) => (fromIsland(e) ? aiUsage.state() : null));
+  ipcMain.handle('ai-refresh', (e, id) => (fromIsland(e) ? aiUsage.refresh(aiId(id) || undefined) : null));
+  ipcMain.handle('ai-signin', (e, id) => (fromIsland(e) && aiId(id) ? aiSignIn(aiId(id)) : false));
+  ipcMain.handle('ai-signout', (e, id) => (fromIsland(e) && aiId(id) ? aiSignOut(aiId(id)) : null));
 }
 
 app.whenReady().then(async () => {
@@ -343,6 +395,10 @@ app.whenReady().then(async () => {
     executable: process.platform === 'win32' ? path.join(app.isPackaged ? process.resourcesPath : path.join(__dirname, 'dist'), 'discord-social', 'astrum-discord-social.exe') : null,
     getClientId: () => store.settings().discordId,
     onState: (state) => { if (island && !island.isDestroyed()) island.webContents.send('discord-social-state', state); }
+  });
+  aiUsage = createAiUsage({
+    fetchFor: aiFetch, dataDir: app.getPath('userData'),
+    onState: (s) => { if (island && !island.isDestroyed()) island.webContents.send('ai-usage', s); }
   });
   bot = createBot({ getToken: getBotToken, getChannels: () => store.settings().channels, onFeed: (f) => sendAll('discord-feed', f) });
   const spotifyAuth = createSpotifyAuth({
@@ -371,10 +427,11 @@ app.whenReady().then(async () => {
   presence.setEnabled(s.presence);
   presence.connect(s.discordId);
   if (s.botToken) bot.start();
+  aiUsage.start();
   // first run: nothing set up yet, so the set-up guide opens in your browser
   if (!store.get('np-client') && !store.get('yt-client') && !s.discordId && !s.botToken) setTimeout(() => openGuide('index'), 1500);
 });
 app.on('second-instance', () => { if (island) { island.showInactive(); island.webContents.send('island-poke'); } });
 app.on('will-quit', () => globalShortcut.unregisterAll());
-app.on('before-quit', () => { quitting = true; if (social) social.stop(); if (store) store.flush(); if (presence) presence.stop(); if (bot) bot.stop(); });
+app.on('before-quit', () => { quitting = true; if (social) social.stop(); if (aiUsage) aiUsage.stop(); if (store) store.flush(); if (presence) presence.stop(); if (bot) bot.stop(); });
 app.on('window-all-closed', () => { /* stays in the tray */ });
