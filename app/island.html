@@ -12,8 +12,7 @@
    The desktop window fits the active panel. */
 @property --acc { syntax: '<color>'; inherits: true; initial-value: #1ed760; }
 :root { color-scheme: dark; --acc: #1ed760; --glow: .25; --ink: #f5f3ff; --ink2: rgba(245, 243, 255, .65); --edge: rgba(255, 255, 255, .09);
-  --sp: #1ed760; --yt: #ff4e45; --dc: #5865f2; --ease: cubic-bezier(.22, 1, .36, 1); --full-opacity: .70;
-  --yt-header: 44px; --yt-grab: 16px; }
+  --sp: #1ed760; --yt: #ff4e45; --dc: #5865f2; --ease: cubic-bezier(.22, 1, .36, 1); --full-opacity: .70; }
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
 body { color: var(--ink); font: 500 13px/1.35 "Chakra Petch", "Segoe UI", system-ui, sans-serif; user-select: none; -webkit-font-smoothing: antialiased; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
@@ -232,6 +231,9 @@ body.moving .pill .pt, body.moving .pill .eq, body.moving .pill .badge, body.mov
 /* nothing playing: six dots light up in turn; now and then each one opens into a letter of "astrum" */
 .idle { display: none; flex: 1; align-items: center; gap: 1px; height: 20px; }
 #isl[data-kind="app"] .eq, .idle-motion #isl[data-kind="app"] .pt { display: none; }
+#isl[data-kind="ai"] .eq { display: none; }
+#isl[data-ai-heat="warn"] .pill .ic { color: #f5b942; }
+#isl[data-ai-heat="hi"] .pill .ic { color: #ff6b5e; }
 .idle-motion #isl[data-kind="app"] .idle { display: flex; }
 body:not(.idle-motion) #isl[data-kind="app"][data-l="0"] .pill .ic { animation:idle-breathe 4s ease-in-out infinite; }
 @keyframes idle-breathe { 0%,100% { opacity:.55; transform:scale(.94); } 50% { opacity:1; transform:scale(1); } }
@@ -248,6 +250,7 @@ body:not(.idle-motion) #isl[data-kind="app"][data-l="0"] .pill .ic { animation:i
 .head { top: 0; height: 46px; display: flex; align-items: center; gap: 4px; padding: 0 10px 0 12px; }
 .tabs { flex: 1; display: flex; gap: 2px; min-width: 0; }
 .tabs button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 8px; border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--ink2); white-space: nowrap; transition: background .2s, color .2s; }
+.tabs button[hidden] { display: none; }   /* Settings › Tabs */
 .tabs button svg { width: 15px; height: 15px; flex: none; }
 .tabs button:hover { color: #fff; }
 .tabs button[aria-selected="true"] { color: #fff; background: rgba(255, 255, 255, .09); }
@@ -418,19 +421,6 @@ body.np-full .np-dj .dj-glow { display: none; }
 .np-dj .dj-top .dj-go svg { width: 15px; height: 15px; }
 .np-dj .dj-tag { padding: 0 6px 0 0; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; font-size: 10.5px; letter-spacing: .18em; color: rgba(245, 243, 255, .7); }
 .np-dj .dj-tag i { width: 6px; height: 6px; }
-body.np-full .np-dj.m-yt { background: #08080c; padding: 0; gap: 0; grid-template-rows: var(--yt-header) minmax(0, 1fr) var(--yt-grab); }
-body.np-full .np-dj.m-yt .dj-top { padding: 0 12px; }
-body.np-full .np-dj.m-yt .dj-x { display: inline-flex; width: auto; padding: 0 10px; gap: 6px; font-size: 12px; }
-body.np-full .np-dj.m-yt .dj-mid { text-align: center; }
-body.np-full .np-dj.m-yt .dj-meta { justify-items: center; }
-body.np-full .np-dj.m-yt .dj-card, body.np-full .np-dj.m-yt .dj-glow,
-body.np-full .np-dj.m-yt .dj-prog, body.np-full .np-dj.m-yt .dj-bot,
-body.np-full .np-dj.m-yt .dj-prev, body.np-full .np-dj.m-yt .dj-next { display: none; }
-body.np-full .np-dj.m-yt .dj-yt-grab { display: grid; place-items: center; cursor: ns-resize; touch-action: none; }
-.dj-yt-grab::after { content: ""; width: 48px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, .3); }
-.dj-yt-grab:hover::after { background: rgba(255, 255, 255, .75); }
-body.np-full .np.yt-full .yt-vid { inset: var(--yt-header) 0 var(--yt-grab); width: auto; height: auto; aspect-ratio: auto; visibility: hidden; border-radius: 0; box-shadow: none; background: #000; }
-body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) {
   .pill .ic { animation:none!important; }
   #isl, .aura { transition: none; } .pt.mq span, #isl.playing .eq i, .aura::before, .aura::after, .idle .ch i, #isl, .glow { animation: none !important; }
@@ -496,12 +486,23 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
         <p class="hint">Lower the backdrop opacity to see more of your desktop behind Spotify and Discord.</p>
       </section>
       <section>
+        <h3>Tabs</h3>
+        <div class="grp">
+          <button type="button" class="row s-tabsp" role="switch" aria-checked="true"><span>Spotify</span><i class="tg"></i></button>
+          <button type="button" class="row s-tabyt" role="switch" aria-checked="true"><span>YouTube</span><i class="tg"></i></button>
+          <button type="button" class="row s-tabdc" role="switch" aria-checked="true"><span>Discord</span><i class="tg"></i></button>
+          <button type="button" class="row s-tabai" role="switch" aria-checked="true"><span>AI usage</span><i class="tg"></i></button>
+        </div>
+        <p class="hint">A tab that is off is hidden from the island. One always stays on.</p>
+      </section>
+      <section>
         <h3>Island</h3>
         <div class="grp">
           <button type="button" class="row s-aura" role="switch" aria-checked="true"><span>Pulsing aura</span><i class="tg"></i></button>
           <button type="button" class="row s-sky" role="switch" aria-checked="false"><span>Background effects</span><i class="tg"></i></button>
           <button type="button" class="row s-intro" role="switch" aria-checked="false"><span>Animate the idle pill</span><i class="tg"></i></button>
           <button type="button" class="row s-glass" role="switch" aria-checked="true"><span>Glass</span><i class="tg"></i></button>
+          <button type="button" class="row s-airot" role="switch" aria-checked="true"><span>Show AI usage on the closed island now and then</span><i class="tg"></i></button>
           <div class="row"><span>Glass clarity</span><input type="range" class="s-clarity" min="0" max="100" aria-label="Glass clarity"><output class="s-clarityv">50</output></div>
         </div>
       </section>
@@ -511,6 +512,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
           <button type="button" class="row s-cards" role="switch" aria-checked="true"><span>Pop-up cards</span><i class="tg"></i></button>
           <button type="button" class="row s-csong n-sub" role="switch" aria-checked="true"><span>When a new song starts</span><i class="tg"></i></button>
           <button type="button" class="row s-cmsg n-sub" role="switch" aria-checked="true"><span>Discord messages</span><i class="tg"></i></button>
+          <button type="button" class="row s-aialert n-sub" role="switch" aria-checked="true"><span>AI usage running low (20%, 10%, 5% left)</span><i class="tg"></i></button>
           <div class="row stack n-sub s-cchans" hidden><span>From these channels</span><span class="segs s-chans" role="group" aria-label="Channels that pop up"></span></div>
           <button type="button" class="row s-cping" role="switch" aria-checked="true"><span>Glow pulse for messages (Menu bar mode)</span><i class="tg"></i></button>
           <div class="row stack n-sub"><span>Stay on screen for</span><span class="segs s-csecs" role="group" aria-label="How long a card stays"><button type="button" data-v="4">4 sec</button><button type="button" data-v="7">7 sec</button><button type="button" data-v="12">12 sec</button></span></div>
@@ -610,7 +612,15 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   /* ---------- state ---------- */
   var level = 0, tab = 'sp', sticky = false, panel = null;
   try { var keptTab = localStorage.getItem('ia-tab'); if (keptTab === 'sp' || keptTab === 'yt' || keptTab === 'dc' || keptTab === 'ai') tab = keptTab; } catch (e) { }   // the tab you had open last
-  function setTab(t) { tab = t; try { localStorage.setItem('ia-tab', t); } catch (e) { } paintPill(); }
+  function setTab(t) { if (!tabOn(t)) return; tab = t; try { localStorage.setItem('ia-tab', t); } catch (e) { } paintPill(); }
+  // Settings › Tabs: a tab that is off is hidden; when the open one goes off, the first one still on opens
+  var TAB_KEY = { sp: 'tabSp', yt: 'tabYt', dc: 'tabDc', ai: 'tabAi' };
+  function tabOn(t) { return Astrum.theme.get()[TAB_KEY[t]] !== false; }
+  function shownTabs() { return ['sp', 'yt', 'dc', 'ai'].filter(tabOn); }
+  function paintTabs() {
+    $$('.tabs button').forEach(function (b) { b.hidden = !tabOn(b.dataset.t); });
+    if (!tabOn(tab) && shownTabs()[0]) { setTab(shownTabs()[0]); render(); }
+  }
   var music = { spotify: null, youtube: null }, lead = null, feed = { configured: false, messages: [], channels: [] }, dcStatus = { text: '', ok: false }, dcChan = 'all';
   var dcSocial = { phase: 'disconnected', friends: [], error: '' };
   var settings = {};
@@ -637,11 +647,14 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   function paintPill() {
     var m = leading(), u = unread(), kind, text;
     var voice = dcSocial.phase === 'ready' && dcSocial.voice && dcSocial.voice.active && dcSocial.voice.status !== 'Disconnected';
-    if (m) { kind = m.source === 'youtube' ? 'yt' : 'sp'; text = m.title + (m.artist ? ' · ' + m.artist : ''); }
+    var ai = aiTurn && aiPanel ? aiPanel.summary() : null;   // its turn in the rotation: the AI usage, for a few seconds
+    isl.dataset.aiHeat = ai ? ai.heat : '';
+    if (ai) { kind = 'ai'; text = ai.text; }
+    else if (m) { kind = m.source === 'youtube' ? 'yt' : 'sp'; text = m.title + (m.artist ? ' · ' + m.artist : ''); }
     else if (voice) { kind = 'dc'; text = 'Discord · Voice room'; }
     else { kind = 'app'; text = 'Astrum'; }
     isl.classList.toggle('playing', !!(m && m.audio !== false || voice && dcSocial.voiceAudio));
-    var icon = $('.pill .ic'), cover = !Astrum.theme.get().glass && m ? m.art : '';
+    var icon = $('.pill .ic'), cover = !Astrum.theme.get().glass && m && !ai ? m.art : '';   // the AI turn shows its own icon
     if (cover) {
       if (icon.dataset.cover !== cover) {
         icon.dataset.cover = cover;
@@ -793,7 +806,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     if (!t) {
       if (tab === 'sp') { p.appendChild(emptyBox('Nothing playing on Spotify', 'Choose where Spotify should play.', 'Choose a device', openDevices)); return; }
       var ytLib = window.YTMusic && YTMusic.library();
-      var watch = emptyBox('Watch YouTube', ytLib ? 'Search, discover videos or open a playlist.' : 'Paste a video link or connect your YouTube library.', 'Open the player', function () { go(2); });
+      var watch = emptyBox('YouTube in your browser', 'Play something on youtube.com and control it from here, or connect your browser first.', 'Open YouTube controls', function () { go(2); });
       if (!ytLib) {
         var actions = el('div', 'empty-actions'), setup = el('button', 'go', 'Set up YouTube');
         setup.type = 'button'; setup.addEventListener('click', function () { guide('youtube'); });
@@ -861,8 +874,38 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
   /* ---------- AI usage: Claude and ChatGPT limits (peek rows, and the account cards when expanded) ---------- */
   var aiPanel = D && D.ai ? AiPanel.mount($('.aip'), D.ai, {
     expand: function () { sticky = true; go(2); },
-    onChange: function () { if (tab === 'ai' && level === 1) paintPeek(); }
+    onChange: function () { if (tab === 'ai' && level === 1) paintPeek(); if (aiTurn) paintPill(); aiAlerts(); }
   }) : null;
+  /* a card when a session gets to 20%, 10% and 5% left: each once per session window (remembered, so a restart does not
+     repeat it), only the lowest one reached when several come at once */
+  var AI_LEVELS = [5, 10, 20];
+  function aiAlerts() {
+    var s = aiPanel && aiPanel.summary(); if (!s) return;
+    var fired = {}; try { fired = JSON.parse(localStorage.getItem('ia-ai-alerts') || '{}') || {}; } catch (e) { }
+    var changed = false, now = Date.now();
+    s.accounts.forEach(function (a) {
+      var key = a.id + ':' + (a.resetsAt || 0), done = fired[key] || [];
+      if (!AI_LEVELS.some(function (l) { return a.left <= l && done.indexOf(l) < 0; })) return;
+      fired[key] = AI_LEVELS.filter(function (l) { return a.left <= l; }); changed = true;
+      if (Astrum.theme.get().aiAlert === false) return;
+      showCard({ kind: 'ai', kicker: 'AI usage · ' + a.name, title: Math.round(a.left) + '% of your session left',
+        text: a.resetsAt ? 'Resets in ' + aiSpan(a.resetsAt - now) : 'Session limit', icon: IC.ai, ms: cardMs() + 2000,
+        actions: [{ label: 'Open', pri: true, fn: function () { setTab('ai'); sticky = true; go(2); } }] });
+    });
+    if (!changed) return;
+    var kept = {};   // only windows that have not reset yet
+    Object.keys(fired).forEach(function (k) { var at = +k.split(':')[1]; if (!at || at > now) kept[k] = fired[k]; });
+    try { localStorage.setItem('ia-ai-alerts', JSON.stringify(kept)); } catch (e) { }
+  }
+  function aiSpan(ms) { var m = Math.max(1, Math.round(ms / 60000)), h = Math.floor(m / 60); return h ? h + 'h ' + (m % 60) + 'm' : m + 'm'; }
+  Astrum.theme.onChange(paintTabs); paintTabs();
+  // the closed island takes turns: every 30 s the AI usage shows for 6 s, then what it showed before comes back
+  var aiTurn = false;
+  if (aiPanel) setInterval(function () {
+    if (level !== 0 || aiTurn || Astrum.theme.get().aiRotate === false || !aiPanel.summary()) return;
+    aiTurn = true; paintPill();
+    setTimeout(function () { aiTurn = false; paintPill(); }, 6000);
+  }, 30000);
   if (aiPanel) new ResizeObserver(function () { if (level === 2 && tab === 'ai' && !setOpen) size(); }).observe($('.aip-in'));
   function discordView(personal) {
     $('.dc-personal').hidden = !personal; $('.dc-server-feed').hidden = personal;
@@ -1227,7 +1270,7 @@ body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events:
     else if (playing && k === 'ArrowRight') { e.preventDefault(); media('next'); }
     else if (playing && k === 'ArrowLeft') { e.preventDefault(); media('prev'); }
     else if (playing && (k === 'l' || k === 'L')) media('like');
-    else if (k === '1' || k === '2' || k === '3' || k === '4') { sticky = true; setTab(['sp', 'yt', 'dc', 'ai'][+k - 1]); panel = null; if (level === 0) go(1); else render(); }
+    else if ((k === '1' || k === '2' || k === '3' || k === '4') && shownTabs()[+k - 1]) { sticky = true; setTab(shownTabs()[+k - 1]); panel = null; if (level === 0) go(1); else render(); }
     else if (k === '/' && tab !== 'ai') { e.preventDefault(); sticky = true; if (tab === 'dc') { go(2); $('.dc-personal .ds-filter').focus(); } else { if (level !== 1) go(1); setTimeout(function () { askIn.focus(); }, 60); } }
   });
   document.addEventListener('keydown', function (e) {

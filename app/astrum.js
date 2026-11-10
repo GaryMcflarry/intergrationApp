@@ -11,7 +11,7 @@
   /* ---------- the theme ---------- */
   var PRESETS = ['#7C4DFF', '#3B82F6', '#2DD4BF', '#A3E635', '#F59E0B', '#FF6B3D', '#F43F5E', '#EC4899', '#A855F7', '#7DD3FC', '#22C55E', '#94A3B8'];
   var SOURCE = { sp: '#1ED760', yt: '#FF4E45', dc: '#5865F2' };
-  var KEY = 'astrum-theme-v1', DEF = { accent: '#1ED760', glow: 25, fullOpacity: 70, follow: true, cycle: false, every: 8, aura: false, sky: false, intro: false, glass: true, clarity: 50, cards: true, cardSong: true, cardMsg: true, cardPing: true, cardSecs: 7, cardMute: [], snooze: 0, msize: 100, mside: 0, v: 2 };
+  var KEY = 'astrum-theme-v1', DEF = { accent: '#1ED760', glow: 25, fullOpacity: 70, follow: true, cycle: false, every: 8, aura: false, sky: false, intro: false, glass: true, clarity: 50, cards: true, cardSong: true, cardMsg: true, cardPing: true, cardSecs: 7, cardMute: [], snooze: 0, msize: 100, mside: 0, tabSp: true, tabYt: true, tabDc: true, tabAi: true, aiRotate: true, aiAlert: true, v: 2 };
   var T = load(), src = null, cycleT = 0, subs = [];
 
   function load() {
@@ -124,7 +124,8 @@
   }
 
   /* ---------- the settings panel ---------- */
-  var TOGGLES = [['.s-follow', 'follow'], ['.s-cycle', 'cycle'], ['.s-aura', 'aura'], ['.s-sky', 'sky'], ['.s-intro', 'intro'], ['.s-glass', 'glass'], ['.s-cards', 'cards'], ['.s-csong', 'cardSong'], ['.s-cmsg', 'cardMsg'], ['.s-cping', 'cardPing']];
+  var TOGGLES = [['.s-follow', 'follow'], ['.s-cycle', 'cycle'], ['.s-aura', 'aura'], ['.s-sky', 'sky'], ['.s-intro', 'intro'], ['.s-glass', 'glass'], ['.s-cards', 'cards'], ['.s-csong', 'cardSong'], ['.s-cmsg', 'cardMsg'], ['.s-cping', 'cardPing'],
+    ['.s-tabsp', 'tabSp'], ['.s-tabyt', 'tabYt'], ['.s-tabdc', 'tabDc'], ['.s-tabai', 'tabAi'], ['.s-airot', 'aiRotate'], ['.s-aialert', 'aiAlert']];
   function mountSettings(p) {
     function q(c) { return p.querySelector(c); }
     var sw = q('.sw');
@@ -148,7 +149,12 @@
     var every = q('.s-every');
     every.addEventListener('change', function () { theme.set({ every: Math.max(2, Math.min(120, Math.round(+every.value) || 8)) }); });
     TOGGLES.forEach(function (x) {
-      q(x[0]).addEventListener('click', function () { var o = {}; o[x[1]] = !T[x[1]]; if (x[1] === 'cycle' && o.cycle) o.follow = false; if (x[1] === 'follow' && o.follow) o.cycle = false; theme.set(o); });
+      q(x[0]).addEventListener('click', function () {
+        var o = {}; o[x[1]] = !T[x[1]]; if (x[1] === 'cycle' && o.cycle) o.follow = false; if (x[1] === 'follow' && o.follow) o.cycle = false;
+        // Settings › Tabs: one tab always stays
+        if (/^tab/.test(x[1]) && !o[x[1]] && ['tabSp', 'tabYt', 'tabDc', 'tabAi'].filter(function (k) { return k !== x[1] && T[k]; }).length === 0) return;
+        theme.set(o);
+      });
     });
     function sync() {
       var a = T.accent.toUpperCase();
