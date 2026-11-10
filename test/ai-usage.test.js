@@ -40,8 +40,8 @@ test('Claude: picks the chat organisation and normalises both windows', async ()
   const f = fixture(CLAUDE_OK);
   const c = f.find(await f.usage.refresh('claude'), 'claude');
   assert.equal(c.phase, 'ready'); assert.equal(c.plan, 'Pro');
-  assert.deepEqual(c.session, { pct: 42.3, resetsAt: Date.parse('2026-11-10T14:00:00Z') });
-  assert.deepEqual(c.weekly, { pct: 100, resetsAt: Date.parse('2026-11-14T00:00:00Z') });   // clamped
+  assert.deepEqual(c.session, { pct: 42.3, resetsAt: Date.parse('2026-11-10T14:00:00Z'), windowMs: null });
+  assert.deepEqual(c.weekly, { pct: 100, resetsAt: Date.parse('2026-11-14T00:00:00Z'), windowMs: null });   // clamped
   assert.equal(c.updatedAt, NOW);
   assert.deepEqual(c.history, [{ t: NOW, s: 42.3, w: 100 }]);
   assert.ok(f.calls.some((x) => x.url.endsWith(ORG + '/usage')));
@@ -51,11 +51,18 @@ test('ChatGPT: sends the token, orders windows by length, never exposes the toke
   const f = fixture(GPT_OK);
   const s = await f.usage.refresh('chatgpt'), g = f.find(s, 'chatgpt');
   assert.equal(g.phase, 'ready'); assert.equal(g.plan, 'plus');
-  assert.deepEqual(g.session, { pct: 12, resetsAt: NOW + 3600 * 1000 });   // the 5-hour window, though it came second
-  assert.deepEqual(g.weekly, { pct: 61, resetsAt: 1763200000 * 1000 });
+  assert.deepEqual(g.session, { pct: 12, resetsAt: NOW + 3600 * 1000, windowMs: 18000 * 1000 });   // the 5-hour window, though it came second
+  assert.deepEqual(g.weekly, { pct: 61, resetsAt: 1763200000 * 1000, windowMs: 604800 * 1000 });
   const everything = JSON.stringify(f.states) + fs.readFileSync(path.join(f.dir, 'ai-usage.json'), 'utf8');
   assert.equal(everything.includes('secret-token'), false);
   assert.equal(everything.includes('x@y.z'), false);
+});
+
+test('ChatGPT: a window that does not say its length gets none', async () => {
+  const f = fixture({ ...GPT_OK, 'https://chatgpt.com/backend-api/wham/usage': reply(200, { rate_limit: {
+    primary_window: { used_percent: 30, reset_after_seconds: 600 }, secondary_window: { used_percent: 5, limit_window_seconds: -1, reset_after_seconds: 60 } } }) });
+  const g = f.find(await f.usage.refresh('chatgpt'), 'chatgpt');
+  assert.equal(g.session.windowMs, null); assert.equal(g.weekly.windowMs, null);
 });
 
 test('401, a 403 with JSON, or no token means signed out', async () => {
@@ -89,7 +96,7 @@ test('a failure keeps the last good numbers; malformed answers do not throw', as
   assert.equal(g.find(await g.usage.refresh('chatgpt'), 'chatgpt').phase, 'error');
   const m = fixture({ ...CLAUDE_OK, ['https://claude.ai/api/organizations/' + ORG + '/usage']: reply(200, { five_hour: { utilization: 'x' } }) });
   const mc = m.find(await m.usage.refresh('claude'), 'claude');
-  assert.deepEqual(mc.session, { pct: null, resetsAt: null }); assert.equal(mc.weekly, null);
+  assert.deepEqual(mc.session, { pct: null, resetsAt: null, windowMs: null }); assert.equal(mc.weekly, null);
 });
 
 test('an unreachable site is an error message', async () => {
