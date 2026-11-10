@@ -1,6 +1,7 @@
-/* YouTube as a remote, like the Spotify tab: what plays on YouTube in your browser (Astrum's extension reports it through
-   the app, lib/yt-bridge.js), its controls, the queue and YouTube's "Up next". Nothing plays here. Google sign-in gives
-   read-only access to your playlists and likes, and the Data API for search; a row you press plays in your browser. */
+/* YouTube in Astrum's own embedded player, laid out like the Spotify tab: Now (a small player, which YouTube asks stays
+   visible, and the controls), Queue (the playlist or mix it has loaded), Up next (a mix from this video, and your
+   likes), Playlists and Search. Google sign-in gives read-only access to your playlists and likes, and the Data API for
+   search and titles. A pasted video link plays without signing in. */
 window.YTMusic = (function () {
   'use strict';
   var API = 'https://www.googleapis.com/youtube/v3/', SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
@@ -17,10 +18,12 @@ window.YTMusic = (function () {
     pause: '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>',
     open: '<svg viewBox="0 0 24 24"><path d="M7 14l5-5 5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     close: '<svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    pip: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.9"/><rect x="12" y="11" width="7" height="6" rx="1"/></svg>',
     shuffle: '<svg viewBox="0 0 24 24"><path d="M4 7h3c4 0 6 10 10 10h3M4 17h3c1.6 0 2.8-1.6 3.8-3.4M14 7h6M17 4l3 3-3 3M17 14l3 3-3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     mix: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 8.5v7l6-3.5z"/></svg>',
     wide: '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     narrow: '<svg viewBox="0 0 24 24"><path d="M19 11h-6V5M5 13h6v6M13 11l7-7M11 13l-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    full: '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     back: '<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     share: '<svg viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M5 13v6h14v-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     redo: '<svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5M19 4v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
@@ -115,24 +118,34 @@ window.YTMusic = (function () {
   }
   function ago(t) { var m = Math.round((Date.now() - t) / 60000); return m < 2 ? 'just now' : m < 90 ? m + ' min ago' : m < 48 * 60 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; }
 
-  /* mount(container, host): YouTube as a tab of the Spotify player, in the same layout (the same small card, bands and
-     lists). host: { setBig(on), isBig(), toggleWide(), isWide(), pauseOther(), openFull(), onChange() } */
+  /* ---------- YouTube's embedded player ---------- */
+  var apiP = null;
+  function ytApi() {
+    if (apiP) return apiP;
+    apiP = new Promise(function (res, rej) {
+      if (window.YT && YT.Player) { res(); return; }
+      var prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = function () { if (prev) try { prev(); } catch (e) { } res(); };
+      var s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; s.async = true;
+      s.onerror = function () { apiP = null; rej(new Error('Could not reach YouTube')); };
+      document.head.appendChild(s);
+    });
+    return apiP;
+  }
+
+  /* mount(container, host): YouTube as a tab of the Spotify player, in the same layout (the same small card,
+     bands and lists). host: { setBig(on), isBig(), toggleWide(), isWide(), pauseOther(), canPip, pipHost, openFull(), onChange() } */
   function mount(root, host) {
-    var remote = window.desktop && window.desktop.yt;   // the app only: a website copy of the player has no browser to reach
     root.innerHTML = '<div class="np-mini"><img class="np-art" alt=""><div class="np-txt"><b class="np-t"><span>YouTube</span></b><span class="np-a"></span></div>' +
       '<div class="np-btns"><button type="button" class="np-prev" aria-label="Previous">' + ICON.prev + '</button><button type="button" class="np-play" aria-label="Play">' + ICON.play + '</button>' +
-      '<button type="button" class="np-next" aria-label="Next">' + ICON.next + '</button>' +
+      '<button type="button" class="np-next" aria-label="Next">' + ICON.next + '</button><button type="button" class="np-pip" aria-label="Small window" title="Small window: a little player that stays on top">' + ICON.pip + '</button>' +
       '<button type="button" class="np-wide" aria-label="Expand" title="Expand">' + ICON.wide + '</button><button type="button" class="np-exp" aria-label="More" aria-expanded="false">' + ICON.open + '</button></div>' +
       '<span class="np-line" aria-hidden="true"><i></i></span></div>' +
       '<div class="np-more"><div class="np-bands" role="tablist" aria-label="YouTube">' +
       [['now', 'Now'], ['queue', 'Queue'], ['next', 'Up next'], ['pl', 'Playlists'], ['search', 'Search']].map(function (b, i) { return '<button type="button" role="tab" data-p="' + b[0] + '" aria-selected="' + (i ? 'false' : 'true') + '">' + b[1] + '</button>'; }).join('') + '</div>' +
-      '<section class="np-pane on" data-pane="now" role="tabpanel" aria-label="Now"><img class="np-hero yt-cover" alt="" hidden>' +
-      '<div class="yt-connect" hidden><b>Connect your browser</b><ol><li>In Chrome, Edge or Brave, open <em>Extensions</em>, turn on <em>Developer mode</em>, choose <em>Load unpacked</em> and pick the <em>extension/youtube</em> folder in Astrum\'s folder.</li>' +
-      '<li>Press <em>Copy pairing code</em> below and paste it into the extension\'s popup.</li><li>Play something on youtube.com. It shows up here.</li></ol>' +
-      '<div class="np-acts"><button type="button" class="yt-code">' + ICON.share + 'Copy pairing code</button><button type="button" class="yt-newcode">' + ICON.redo + 'New code</button></div></div>' +
-      '<div class="np-acts yt-nowacts"><button type="button" class="yt-mixnow">' + ICON.mix + 'Mix from this video</button></div>' +
-      '<p class="np-note yt-error" role="status"></p><div class="np-foot"><span class="yt-ch"></span><a class="np-link yt-link" target="_blank" rel="noopener" href="https://www.youtube.com">Open in YouTube ↗</a></div>' +
-      '<div class="np-acts np-shares" hidden><button type="button" class="yt-share">' + ICON.share + 'Share to Discord</button></div></section>' +
+      '<section class="np-pane on" data-pane="now" role="tabpanel" aria-label="Now"><div class="np-hero yt-vid"><div class="yt-ph"><span>' + ICON.mix + '<em>Search or paste a YouTube link to start</em></span></div></div>' +
+      '<div class="np-acts"><button type="button" class="yt-fullscreen" hidden>' + ICON.full + 'Full screen</button><button type="button" class="yt-mixnow">' + ICON.mix + 'Mix from this video</button><button type="button" class="yt-shuf">' + ICON.shuffle + 'Shuffle my likes</button></div>' +
+      '<p class="np-note yt-error" role="status"></p><div class="np-foot"><span class="yt-ch"></span><a class="np-link yt-link" target="_blank" rel="noopener" href="https://www.youtube.com">Open in YouTube ↗</a></div><div class="np-acts np-shares" hidden><button type="button" class="yt-share">' + ICON.share + 'Share to Discord</button></div></section>' +
       '<section class="np-pane" data-pane="queue" role="tabpanel" aria-label="Queue"><ul class="np-list yt-ql"></ul></section>' +
       '<section class="np-pane" data-pane="next" role="tabpanel" aria-label="Up next"><ul class="np-list yt-nl"></ul></section>' +
       '<section class="np-pane" data-pane="pl" role="tabpanel" aria-label="Playlists"><ul class="np-list yt-pl"></ul><div class="np-foot"><span class="yt-when"></span><span class="np-acts"><button type="button" class="yt-refresh">' + ICON.redo + 'Refresh library</button></span></div></section>' +
@@ -141,73 +154,110 @@ window.YTMusic = (function () {
     function $$(c) { return Array.prototype.slice.call(root.querySelectorAll(c)); }
     var NOTE = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#3a1418"/><circle cx="20" cy="20" r="11" fill="none" stroke="#ff8a84" stroke-width="2"/><path d="M17 15v10l8-5z" fill="#ff8a84"/></svg>');
     $('.np-art').src = NOTE; $('.np-art').onerror = function () { if (this.getAttribute('src') !== NOTE) this.src = NOTE; };
-    // what the browser's YouTube tab plays (lib/yt-bridge.js's shape), and when it was heard
-    // via: 'extension' (all of it), or 'system' (the computer's media controls: what plays and the buttons, nothing else)
-    var S = { connected: false, via: '', video: '', title: '', channel: '', playing: false, position: 0, duration: 0, volume: null, list: '', index: -1, queue: [], upNext: [] };
-    var heard = Date.now(), pane = 'now', wasPlaying = false;
+    var player = null, ready = null, playing = false, cur = null, pane = 'now', loadSerial = 0, playbackError = '';
+    var known = {};   // video id -> { t, c }: titles seen in your library, playlists and searches (for the Queue)
 
     var flashT = 0;
     function flash(msg, ok) { var a = $('.np-a'); clearTimeout(flashT); a.textContent = msg; a.classList.add('fl'); a.classList.toggle('bad', !ok); flashT = setTimeout(function () { a.classList.remove('fl', 'bad'); paint(); }, 4500); }
-    function position() { return Math.min(S.duration || Infinity, S.position + (S.playing ? (Date.now() - heard) / 1000 : 0)); }
-    function cmd(name, arg) {
-      if (!remote) { flash('Open Astrum on your computer to control YouTube'); return; }
-      if (!S.connected) { flash('Connect your browser first'); setPane('now'); host.setBig(true); return; }
-      remote.command(name, arg).then(function (ok) { if (!ok) flash('Your browser did not answer. Is the YouTube tab still open?'); });
-    }
-    // plays in your browser's YouTube tab; with no tab connected, in a new one of your default browser
-    function start(src, label) {
-      var arg = { v: src.video || (src.ids && src.ids[src.at || 0]) || '', list: src.list || '', index: src.list && src.at ? src.at : undefined };
-      if (!remote) { if (arg.v) window.open(watchUrl(arg.v), '_blank', 'noopener'); return; }
-      if (S.connected && S.via === 'extension') { remote.command('open', arg).then(function (ok) { flash(ok ? 'Playing ' + label + ' in your browser' : 'Your browser did not answer', ok); }); return; }
-      remote.openExternal(arg).then(function (ok) { flash(ok ? 'Opened ' + label + ' in your browser' : 'Could not open your browser', ok); });
+    function showPlaybackError(message) {
+      playbackError = message; $('.yt-error').textContent = message;
+      if (message) flash(message);
+      if (host.onChange) host.onChange();
     }
 
+    function getPlayer() {   // made on first use, inside the Now band's cover
+      if (ready) return ready;
+      ready = ytApi().then(function () {
+        return new Promise(function (res) {
+          var holder = el('div'); $('.yt-vid').appendChild(holder);
+          player = new YT.Player(holder, {
+            width: '100%', height: '100%', playerVars: { playsinline: 1, rel: 0, iv_load_policy: 3, origin: location.origin },
+            events: {
+              onReady: function () { var ph = $('.yt-ph'); if (ph) ph.remove(); res(player); },
+              onStateChange: function (e) { playing = e.data === 1; if (playing) { showPlaybackError(''); host.pauseOther(); keep(); } paint(); },
+              onError: function (e) {
+                playing = false;
+                var reasons = {
+                  2: 'YouTube rejected this video link. Check the link and try again.',
+                  5: 'YouTube could not play this video in the embedded player. Try another video or open it on YouTube.',
+                  100: 'This video is unavailable, private, or has been removed.',
+                  101: 'The video owner has disabled embedded playback. Open this video on YouTube.',
+                  150: 'The video owner has disabled embedded playback. Open this video on YouTube.',
+                  153: 'YouTube could not identify the embedded player. Reload Astrum and try again.'
+                };
+                showPlaybackError((reasons[e.data] || 'YouTube could not play this video.') + ' (YouTube error ' + e.data + ')');
+                var ids = player.getPlaylist(), index = player.getPlaylistIndex(), attempt = loadSerial;
+                if (ids && index >= 0 && index + 1 < ids.length) setTimeout(function () { if (attempt === loadSerial && !playing) player.nextVideo(); }, 1200);
+                paint();
+              }
+            }
+          });
+        });
+      }).catch(function (e) { ready = null; showPlaybackError(e.message); throw e; });
+      return ready;
+    }
     var lastEmit = null;
-    function playingSomething() { return S.connected && !!(S.video || S.title); }
     function trackObj() {
-      if (!playingSomething()) return null;
-      return { source: 'youtube', id: S.video || 'system:' + S.title, title: S.title || 'YouTube video', artist: S.channel || '', album: 'YouTube',
-        art: S.video ? 'https://i.ytimg.com/vi/' + encodeURIComponent(S.video) + '/hqdefault.jpg' : '', url: S.video ? watchUrl(S.video) : '', playing: S.playing,
-        audio: S.playing && S.volume !== 0, start: Date.now() - position() * 1000, duration: S.duration * 1000 };
+      var d = player && player.getVideoData ? player.getVideoData() : null; if (!d || !d.video_id) return null;
+      var cur2 = player.getCurrentTime ? player.getCurrentTime() || 0 : 0, dur = player.getDuration ? player.getDuration() || 0 : 0;
+      return { source: 'youtube', id: d.video_id, title: d.title || '', artist: d.author || '', album: 'YouTube',
+        art: 'https://i.ytimg.com/vi/' + d.video_id + '/hqdefault.jpg', url: watchUrl(d.video_id), playing: playing, audio: playing && !(player.isMuted && player.isMuted()) && !(player.getVolume && player.getVolume() === 0), start: Date.now() - cur2 * 1000, duration: dur * 1000 };
     }
     function emitTrack() {
-      var t = trackObj(), id = t ? t.id : '', on = !!(t && t.playing);
+      var t = trackObj(), id = t ? t.id : '', on = !!(t && playing);
       if (lastEmit && lastEmit.id === id && lastEmit.on === on && lastEmit.audio === !!(t && t.audio) && (!t || Math.abs(lastEmit.start - t.start) < 4000)) return;
       lastEmit = { id: id, on: on, audio: !!(t && t.audio), start: t ? t.start : 0 };
       window.dispatchEvent(new CustomEvent('np:track', { detail: t || { source: 'youtube', playing: false } }));
     }
     function paint() {
-      var on = playingSomething(), fl = $('.np-a').classList.contains('fl');
-      root.classList.toggle('playing', on && S.playing);
-      root.classList.toggle('yt-empty', !on);
-      var p = $('.np-play'); p.innerHTML = S.playing ? ICON.pause : ICON.play; p.setAttribute('aria-label', S.playing ? 'Pause' : 'Play');
-      $('.np-t span').textContent = on ? S.title || 'YouTube video' : 'YouTube';
-      if (!fl) $('.np-a').textContent = on ? S.channel : !remote ? 'Open Astrum on your computer' : S.connected ? 'Play something on YouTube in your browser' : 'Connect your browser';
-      var t = on && S.video ? thumb(S.video) : NOTE; if ($('.np-art').getAttribute('src') !== t) $('.np-art').src = t;
-      var cover = $('.yt-cover'), big = on && S.video ? 'https://i.ytimg.com/vi/' + encodeURIComponent(S.video) + '/hqdefault.jpg' : '';
-      cover.hidden = !big; if (big && cover.getAttribute('src') !== big) cover.src = big;
-      $('.yt-connect').hidden = !remote || (S.connected && S.via === 'extension');   // the system's controls: the extension still adds more
-      $('.yt-nowacts').hidden = !(on && S.video);
-      $('.yt-ch').textContent = on ? S.channel : '';
-      $('.yt-link').href = on && S.video ? watchUrl(S.video) : 'https://www.youtube.com';
-      $('.yt-error').textContent = on && S.via === 'system' ? 'Seen through your computer\'s media controls. Connect the browser extension for the queue and suggestions.' : '';
-      if (host.onChange) host.onChange(); emitTrack();
+      root.classList.toggle('playing', playing);
+      var p = $('.np-play'); p.innerHTML = playing ? ICON.pause : ICON.play; p.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+      var d = player && player.getVideoData ? player.getVideoData() : null, fl = $('.np-a').classList.contains('fl');
+      cur = d && d.video_id ? d : null;
+      root.classList.toggle('yt-empty', !(d && d.video_id));
+      if (d && d.video_id) {
+        cur = d; $('.np-t span').textContent = d.title || 'YouTube';
+        var who = d.author || '';
+        if (!fl) $('.np-a').textContent = who;
+        $('.yt-ch').textContent = who; if (!playbackError) $('.yt-link').href = watchUrl(d.video_id);
+        var t = thumb(d.video_id); if ($('.np-art').getAttribute('src') !== t) $('.np-art').src = t;
+      } else if (!fl) $('.np-a').textContent = 'Pick a video, mix or playlist';
+      $('.yt-mixnow').hidden = !(cur && cur.video_id);
+      $('.yt-fullscreen').hidden = !(host.openFull && cur && cur.video_id);
+      var lib = library(); $('.yt-shuf').hidden = !(lib && lib.liked.length);
+      if (lib && Array.isArray(lib.liked)) lib.liked.forEach(function (x) { if (x.v && !known[x.v]) known[x.v] = { t: x.t, c: x.c }; });
+      if (pane === 'queue') fillQueue(); else if (pane === 'next') fillNext();
+      pipPaint(); if (host.onChange) host.onChange(); emitTrack();
     }
     setInterval(function () {   // progress
-      var pc = S.connected && S.duration ? Math.min(100, position() / S.duration * 100).toFixed(2) + '%' : '0';
-      $('.np-line i').style.width = pc;
+      if (!player || !player.getDuration) return; var d = player.getDuration(), t = player.getCurrentTime();
+      var pc = d ? Math.min(100, t / d * 100).toFixed(2) + '%' : '0';
+      $('.np-line i').style.width = pc; if (pipWin) pipWin.document.querySelector('.bar i').style.width = pc;
       emitTrack();
     }, 500);
-    function update(s) {
-      if (!s || typeof s !== 'object') return;
-      var listsBefore = JSON.stringify([S.connected, S.video, S.list, S.queue, S.upNext]);
-      S = s; heard = Date.now();
-      if (S.playing && !wasPlaying) host.pauseOther();   // YouTube started: Spotify pauses
-      wasPlaying = S.playing;
-      paint();
-      if (listsBefore !== JSON.stringify([S.connected, S.video, S.list, S.queue, S.upNext]) && (pane === 'queue' || pane === 'next')) fill(pane);
+    // where you were, so a restart (Lively, the rotation) can carry on with the same mix or playlist
+    function keep() {
+      var last = read('yt-last'); if (!player || !last || !last.src) return;
+      last.i = last.src.video ? 0 : Math.max(0, player.getPlaylistIndex() || 0); last.s = Math.floor(player.getCurrentTime() || 0); store('yt-last', last);
     }
-    if (remote) { remote.onState(update); remote.state().then(update); }
+    setInterval(function () { if (playing) keep(); }, 10000);
+    function start(src, label, at, seconds) {
+      at = at || 0; seconds = seconds || 0;
+      var attempt = ++loadSerial, video = src.video || (src.ids && src.ids[at]);
+      if (pane !== 'queue' && pane !== 'next') setPane('now'); showPlaybackError('');
+      if (video) $('.yt-link').href = watchUrl(video);
+      return getPlayer().then(function (p) {
+        if (attempt !== loadSerial) return false;
+        store('yt-last', { src: src, i: at, s: seconds });
+        if (src.video) p.loadVideoById({ videoId: src.video, startSeconds: seconds });
+        else {
+          if (src.ids) p.loadPlaylist(src.ids, at, seconds); else p.loadPlaylist({ list: src.list, listType: 'playlist', index: at, startSeconds: seconds });
+          setTimeout(function () { if (attempt === loadSerial) { p.setShuffle(!!src.shuffle); if (src.shuffle) p.playVideoAt(0); } }, 900);
+        }
+        flash('Loading ' + label + '…', true); return true;
+      }).catch(function (e) { showPlaybackError(e.message); return false; });
+    }
+    function startFull(src, label, at) { start(src, label, at).then(function (ok) { if (ok && host.openFull) host.openFull(); }); }
 
     // lists, in the same rows as Spotify's
     function list(ul, rows) {
@@ -227,61 +277,83 @@ window.YTMusic = (function () {
           ul.appendChild(li); return;
         }
         var b = el('button', 'np-item'); b.type = 'button'; b.setAttribute('aria-label', r.verb ? r.t : 'Play ' + r.t); b.addEventListener('click', r.go);
-        if (r.on) b.setAttribute('aria-current', 'true');
         if (r.icon) { var ic = el('span', 'np-ico'); ic.innerHTML = r.icon; b.appendChild(ic); }
         else { var im = el('img'); im.alt = ''; im.loading = 'lazy'; im.onerror = function () { this.removeAttribute('src'); }; if (r.img) im.src = r.img; b.appendChild(im); }
         var tx = el('span', 'np-it'); tx.appendChild(el('b', null, r.t)); tx.appendChild(el('small', null, r.s || '')); b.appendChild(tx); li.appendChild(b);
+        if (r.full) { var fu = el('button', 'np-add'); fu.type = 'button'; fu.innerHTML = ICON.full; fu.setAttribute('aria-label', 'Play ' + r.t + ' in the full view'); fu.title = 'Full view'; fu.addEventListener('click', r.full); li.appendChild(fu); }
         ul.appendChild(li);
       });
     }
     function noLib(ul) { list(ul, [{ empty: LIVELY ? 'Sign in on the YouTube page in your PC\'s browser to bring in your library.' : 'Sign in to bring in your playlists and liked videos.', setup: !LIVELY }]); }
     function likedIds(lib) { return lib.liked.map(function (x) { return x.v; }); }
-    function videoRow(v, title, channel, src) {
-      return { t: title, s: channel, img: thumb(v), go: function () { start(src || { video: v }, title); } };
+    function videoRow(v, title, channel) {
+      if (!known[v]) known[v] = { t: title, c: channel };
+      return { t: title, s: channel, img: thumb(v), go: function () { start({ video: v }, title); }, full: function () { startFull({ video: v }, title); } };
     }
     function dataError(e) {
       if (e.reason === 'quotaExceeded' || e.reason === 'dailyLimitExceeded') return { empty: 'The YouTube Data API quota is used up for now.' };
       var needsSignIn = e.status === 401 || !token();
       return { empty: needsSignIn ? 'Sign in to YouTube in your browser, then try again.' : e.message, setup: needsSignIn && !LIVELY };
     }
-    function notHere(ul) {
-      list(ul, [{ empty: !remote ? 'Open Astrum on your computer to see what plays in your browser.' : S.connected ? 'Your computer\'s media controls do not tell the queue or suggestions. Connect the browser extension on the Now band to see them.' : 'Connect your browser on the Now band to see this.' }]);
-    }
-    // Queue: what plays, then the rest of its playlist or mix; pressing one plays it
+    // Queue: what plays, then the rest of the playlist or mix the player has loaded; pressing one plays it
+    var queueKey = '', asked = {};
     function fillQueue() {
-      var ul = $('.yt-ql');
-      if (!S.connected || S.via !== 'extension') { notHere(ul); return; }
+      var ul = $('.yt-ql'), ids = player && player.getPlaylist ? player.getPlaylist() || [] : [], at = player && player.getPlaylistIndex ? player.getPlaylistIndex() : -1;
+      var next = ids.slice(Math.max(0, at + 1), at + 26), key = JSON.stringify([cur && cur.video_id, next, next.map(function (v) { return known[v] ? 1 : 0; })]);
+      if (key === queueKey && ul.firstChild) return;
+      queueKey = key;
       var rows = [];
-      if (S.video) rows.push({ head: 'Playing now' }, { t: S.title || 'YouTube video', s: S.channel, img: thumb(S.video), on: true, go: function () { cmd('toggle'); } });
-      rows.push({ head: S.list ? 'Next in this playlist' : 'Up next' });
-      if (S.queue.length) S.queue.forEach(function (x) { rows.push(videoRow(x.v, x.t, x.c, S.list ? { video: x.v, list: S.list } : null)); });
-      else rows.push({ empty: S.list ? 'Nothing after this one in the playlist.' : 'Nothing queued. Play a playlist or a mix to see what comes next.' });
+      if (cur && cur.video_id) rows.push({ head: 'Playing now' }, { t: cur.title || 'YouTube video', s: cur.author || '', img: thumb(cur.video_id), go: function () { $('.np-play').click(); } });
+      rows.push({ head: 'Up next' });
+      if (next.length) next.forEach(function (v, i) {
+        var k = known[v] || {};
+        rows.push({ t: k.t || 'Video ' + (at + i + 2), s: k.c || '', img: thumb(v), go: function () { player.playVideoAt(at + 1 + i); } });
+      });
+      else rows.push(cur && cur.video_id
+        ? { t: 'Start a mix from this video', icon: ICON.mix, verb: 'Open', go: function () { $('.yt-mixnow').click(); } }
+        : { empty: 'Nothing queued. Open a playlist, start a mix or search for something.' });
       list(ul, rows);
+      lookUp(next);
     }
-    // Up next: YouTube's own suggestions beside the video, then some of your liked videos
+    // the titles the Queue does not know yet (a mix, or a playlist not opened here): one Data API call, signed in only
+    function lookUp(ids) {
+      var want = ids.filter(function (v) { return !known[v] && !asked[v]; }).slice(0, 50), tok = token();
+      if (!want.length || !tok) return;
+      want.forEach(function (v) { asked[v] = 1; });
+      api('videos?part=snippet&id=' + want.map(encodeURIComponent).join(','), tok).then(function (j) {
+        (j.items || []).forEach(function (x) { if (x.id && x.snippet) known[x.id] = { t: x.snippet.title, c: x.snippet.channelTitle || '' }; });
+        if (pane === 'queue') fillQueue();
+      }, function () { /* no titles: the rows keep their numbers */ });
+    }
+    // Up next: a mix from this video, and your liked videos (from the same channel first)
+    var nextKey = '';
     function fillNext() {
-      var ul = $('.yt-nl');
-      if (!S.connected || S.via !== 'extension') { notHere(ul); return; }
-      var rows = [{ head: 'Recommended by YouTube' }];
-      if (S.upNext.length) S.upNext.forEach(function (x) { rows.push(videoRow(x.v, x.t, x.c)); });
-      else rows.push({ empty: S.video ? 'YouTube has not shown suggestions for this video yet.' : 'Suggestions show up once a video plays in your browser.' });
-      var lib = library(), liked = lib && Array.isArray(lib.liked) ? lib.liked.filter(function (x) { return x.v && x.v !== S.video; }) : [];
-      liked.sort(function (a, b) { return Number(b.c === S.channel) - Number(a.c === S.channel); });
-      if (liked.length) rows.push({ head: 'From your liked videos' });
-      liked.slice(0, 8).forEach(function (x) { rows.push(videoRow(x.v, x.t, x.c)); });
+      var lib = library(), ul = $('.yt-nl');
+      var videos = lib && Array.isArray(lib.liked) ? lib.liked.filter(function (x) { return x.v && (!cur || x.v !== cur.video_id); }) : [];
+      if (cur) videos.sort(function (a, b) { return Number(b.c === cur.author) - Number(a.c === cur.author); });
+      videos = videos.slice(0, 12);
+      var key = JSON.stringify([cur && cur.video_id, videos.map(function (x) { return x.v; })]);
+      if (key === nextKey && ul.firstChild) return;
+      nextKey = key;
+      var rows = [];
+      if (cur && cur.video_id) rows.push({ head: 'Keep going' }, { t: 'Mix from “' + (cur.title || 'this video') + '”', s: 'YouTube picks videos like this one', icon: ICON.mix, verb: 'Open', go: function () { $('.yt-mixnow').click(); } });
+      if (lib && lib.liked.length) rows.push({ t: 'Shuffle my liked videos', s: lib.liked.length + ' videos', icon: ICON.shuffle, verb: 'Open', go: function () { $('.yt-shuf').click(); } });
+      if (videos.length) rows.push({ head: 'From your liked videos' });
+      videos.forEach(function (x) { rows.push(videoRow(x.v, x.t, x.c)); });
+      if (!rows.length) { noLib(ul); return; }
       list(ul, rows);
     }
-    function openPl(e, name, ids, src, known) {
+    function openPl(e, name, ids, src, knownTitles) {
       var ul = e && e.currentTarget && e.currentTarget.closest('ul'); if (!ul) { start(src, name); return; }
       var keep = document.createDocumentFragment(), top = ul.scrollTop; while (ul.firstChild) keep.appendChild(ul.firstChild);
       function back() { ul.textContent = ''; ul.appendChild(keep); ul.scrollTop = top; }
-      var titles = known || {}, detail, nextPage = '', loading = false, error = null;
-      function source(at) { return { list: src.list, ids: ids.length ? ids : null, at: at || 0 }; }
-      var bar = { bar: name, back: back, acts: [['Play', ICON.play, function () { start(source(0), name); }]] };
+      var titles = knownTitles || {}, detail, nextPage = '', loading = false, error = null;
+      function source() { return ids.length ? { ids: ids } : src; }
+      var bar = { bar: name, back: back, acts: [['Play', ICON.play, function () { start(source(), name); }], ['Shuffle', ICON.shuffle, function () { start(Object.assign(source(), { shuffle: true }), name); }], ['Full view', ICON.full, function () { startFull(source(), name); }]] };
       function rows() {
         var items = ids.map(function (v, i) {
           var k = titles[v] || {};
-          return { t: k.t || 'Video ' + (i + 1), s: k.c || '', img: thumb(v), go: function () { start(source(i), k.t || name); } };
+          return { t: k.t || 'Video ' + (i + 1), s: k.c || '', img: thumb(v), go: function () { start(source(), name, i); }, full: function () { startFull(source(), name, i); } };
         });
         if (loading) items.push({ empty: 'Loading videos…' });
         else if (error) items.push(error);
@@ -299,7 +371,7 @@ window.YTMusic = (function () {
           var videos = (j.items || []).map(function (x) { return x.snippet || {}; }).filter(function (sn) {
             return sn.resourceId && sn.resourceId.videoId && sn.title !== 'Private video' && sn.title !== 'Deleted video';
           });
-          videos.forEach(function (sn) { titles[sn.resourceId.videoId] = { t: sn.title, c: sn.videoOwnerChannelTitle || '' }; });
+          videos.forEach(function (sn) { titles[sn.resourceId.videoId] = known[sn.resourceId.videoId] = { t: sn.title, c: sn.videoOwnerChannelTitle || '' }; });
           ids = (page ? ids : []).concat(videos.map(function (sn) { return sn.resourceId.videoId; }));
           nextPage = j.nextPageToken || '';
         }, function (e) { error = dataError(e); }).finally(function () {
@@ -307,7 +379,7 @@ window.YTMusic = (function () {
           if (ul.firstChild === detail) rows();
         });
       }
-      if (src.list && !src.known) loadPage(''); else rows();
+      if (src.list) loadPage(''); else rows();
       ul.scrollTop = 0;
     }
     var playlistPages = null;
@@ -327,11 +399,11 @@ window.YTMusic = (function () {
       var rows = [{ head: 'Your playlists' }];
       if (lib.liked.length) {
         var lk = {}; lib.liked.forEach(function (x) { lk[x.v] = { t: x.t, c: x.c }; });
-        rows.push({ t: 'Liked videos', s: lib.liked.length + ' videos', img: thumb(lib.liked[0].v), go: function (e) { openPl(e, 'Liked videos', likedIds(lib), { list: 'LL', known: true }, lk); } });
+        rows.push({ t: 'Liked videos', s: lib.liked.length + ' videos', img: thumb(lib.liked[0].v), go: function (e) { openPl(e, 'Liked videos', likedIds(lib), { ids: likedIds(lib) }, lk); }, full: function () { startFull({ ids: likedIds(lib) }, 'your liked videos'); } });
       }
       pages.items.forEach(function (p) {
-        var ids = (lib.items && lib.items[p.id]) || [];
-        rows.push({ t: p.t, s: p.n != null ? p.n + ' videos' : 'Playlist', img: p.th, go: function (e) { openPl(e, p.t, ids, { list: p.id }); } });
+        var ids = (lib.items && lib.items[p.id]) || [], src = ids.length ? { ids: ids, list: p.id } : { list: p.id };
+        rows.push({ t: p.t, s: p.n != null ? p.n + ' videos' : 'Playlist', img: p.th, go: function (e) { openPl(e, p.t, ids, src); }, full: function () { startFull(src, p.t); } });
       });
       if (pages.loading) rows.push({ empty: 'Loading playlists…' });
       else if (pages.error) rows.push(pages.error);
@@ -342,20 +414,20 @@ window.YTMusic = (function () {
     function fill(p) {
       if (!host.isBig()) return; p = p || pane;
       if (p === 'pl') fillPl(); else if (p === 'queue') fillQueue(); else if (p === 'next') fillNext();
-      else if (p === 'search' && !$('.yt-sl').firstChild) list($('.yt-sl'), [{ empty: 'Search for videos and music, or paste a YouTube video link. It plays in your browser.' }]);
+      else if (p === 'search' && !$('.yt-sl').firstChild) list($('.yt-sl'), [{ empty: 'Search for videos and music, or paste a YouTube video link to play it directly.' }]);
     }
     $('.yt-refresh').addEventListener('click', function () {
       $('.yt-when').textContent = 'Updating…';
       fetchLibrary('').then(function () { fillPl(); flash('Library updated', true); }, function (e) { $('.yt-when').textContent = e.message; });
     });
-    $('.yt-mixnow').addEventListener('click', function () { if (S.video) start({ video: S.video, list: 'RD' + S.video }, 'a mix from ' + (S.title || 'this video')); });
-    $('.yt-code').addEventListener('click', function () { remote.copyCode().then(function (ok) { flash(ok ? 'Pairing code copied. Paste it into the extension' : 'Could not copy the code', ok); }); });
-    $('.yt-newcode').addEventListener('click', function () { remote.newCode().then(function (ok) { flash(ok ? 'New pairing code copied. The old one no longer works' : 'Could not make a new code', ok); }); });
+    $('.yt-mixnow').addEventListener('click', function () { if (cur && cur.video_id) start({ list: 'RD' + cur.video_id }, 'a mix from ' + cur.title); });
+    $('.yt-shuf').addEventListener('click', function () { var lib = library(); if (lib && lib.liked.length) start({ ids: likedIds(lib), shuffle: true }, 'your liked videos'); });
+    $('.yt-fullscreen').addEventListener('click', function () { if (host.openFull) host.openFull(); });
     var searchSerial = 0;
     function search(q, page, previous) {
       var ul = $('.yt-sl'), serial = ++searchSerial;
       list(ul, previous.concat([{ empty: 'Searching…' }]));
-      var path = 'search?part=snippet&type=video&maxResults=15&q=' + encodeURIComponent(q);
+      var path = 'search?part=snippet&type=video&videoEmbeddable=true&maxResults=15&q=' + encodeURIComponent(q);
       if (page) path += '&pageToken=' + encodeURIComponent(page);
       withToken(function (tok) { return api(path, tok); }, '').then(function (j) {
         if (serial !== searchSerial) return;
@@ -369,7 +441,7 @@ window.YTMusic = (function () {
     }
     $('.yt-sform').addEventListener('submit', function (e) {
       e.preventDefault(); var q = $('.yt-sform input').value.trim(), video = videoLink(q);
-      if (video) { searchSerial++; start({ video: video }, 'the video'); }
+      if (video) { searchSerial++; start({ video: video }, 'YouTube video'); }
       else if (q) search(q, '', []);
     });
 
@@ -390,11 +462,15 @@ window.YTMusic = (function () {
     $('.np-wide').addEventListener('click', function () { host.toggleWide(); });
 
     $('.np-play').addEventListener('click', function () {
-      if (!playingSomething()) { if (host.closeFull) host.closeFull(); host.setBig(true); setPane(S.connected ? 'search' : 'now'); return; }
-      cmd(S.playing ? 'pause' : 'play');
+      if (!player) {   // nothing loaded yet: carry on from last time, or open the choices
+        var last = read('yt-last');
+        if (last && last.src) start(last.src, 'YouTube video', last.i, last.s);
+        else { if (host.closeFull) host.closeFull(); host.setBig(true); setPane('search'); $('.yt-sform input').focus(); }
+        return;
+      }
+      if (playing) player.pauseVideo(); else player.playVideo();
     });
-    $('.np-next').addEventListener('click', function () { cmd('next'); });
-    $('.np-prev').addEventListener('click', function () { cmd('prev'); });
+    $('.np-next').addEventListener('click', function () { if (player) player.nextVideo(); });
     if (window.desktop && window.desktop.discord) {
       $('.np-shares').hidden = false;
       $('.yt-share').addEventListener('click', function () {
@@ -402,35 +478,80 @@ window.YTMusic = (function () {
         window.desktop.discord.share(t).then(function (r) { flash(r && r.ok ? 'Shared to Discord: ' + t.title : 'Discord: ' + (r && r.error || 'could not share'), r && r.ok); });
       });
     }
-    $('.np-art').addEventListener('click', function () { if (S.video && host.openFull) host.openFull(); });
+    $('.np-art').addEventListener('click', function () { if (host.openFull) host.openFull(); });
+    $('.np-prev').addEventListener('click', function () { if (player) player.previousVideo(); });
 
+    /* the small window: the browser's picture-in-picture window with the controls (the video stays on the page) */
+    var pipWin = null;
+    var PIPCSS = 'html,body{margin:0;height:100%;background:#07070d;color:#f5f3ff;font:500 13px/1.35 "Chakra Petch","Trebuchet MS",system-ui,sans-serif;overflow:hidden}' +
+      '.pp{position:relative;height:100%;display:grid;grid-template-rows:minmax(0,1fr) auto auto auto;gap:10px;padding:14px;box-sizing:border-box}' +
+      '.bg{position:absolute;inset:-20%;width:140%;height:140%;object-fit:cover;filter:blur(40px) saturate(1.4);opacity:.5;pointer-events:none}.bg:not([src]){display:none}.pp>*:not(.bg){position:relative}' +
+      '.cv{width:100%;height:100%;min-height:0;object-fit:contain;filter:drop-shadow(0 12px 28px rgba(0,0,0,.5))}.cv:not([src]){visibility:hidden}' +
+      '.tx{display:grid;min-width:0;text-align:center}.tx b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tx span{color:rgba(245,243,255,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+      '.bar{height:3px;border-radius:3px;background:rgba(255,255,255,.18);overflow:hidden}.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,transparent,#ff4e45);box-shadow:0 0 8px #ff4e45}' +
+      '.ct{display:flex;justify-content:center;align-items:center;gap:6px}button{font:inherit;color:inherit;background:none;border:0;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;cursor:pointer}' +
+      'button:hover{background:rgba(255,255,255,.14)}button:focus-visible{outline:2px solid #ff4e45}button svg{width:19px;height:19px;fill:currentColor}.play{width:48px;height:48px;background:#f5f3ff;color:#111}.play:hover{background:#fff}' +
+      '@media (max-height:190px){.cv{display:none}.pp{grid-template-rows:1fr auto auto auto}}';
+    function pipPaint() {
+      if (!pipWin) return; var d = pipWin.document, v = cur && cur.video_id;
+      ['.cv', '.bg'].forEach(function (c) { var im = d.querySelector(c); if (v) { var u = 'https://i.ytimg.com/vi/' + v + '/hqdefault.jpg'; if (im.getAttribute('src') !== u) im.src = u; } else im.removeAttribute('src'); });
+      d.querySelector('.tx b').textContent = cur && cur.title || 'YouTube';
+      d.querySelector('.tx span').textContent = cur ? cur.author || '' : 'Pick a video on the page';
+      var p = d.querySelector('.play'); p.innerHTML = playing ? ICON.pause : ICON.play; p.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+      d.title = cur && cur.title ? cur.title + ' · YouTube' : 'YouTube';
+    }
+    $('.np-pip').addEventListener('click', function () {
+      if (!host.canPip) return;
+      if (pipWin) { pipWin.close(); return; }
+      host.pipHost.documentPictureInPicture.requestWindow({ width: 320, height: 380 }).then(function (w) {
+        pipWin = w; var d = w.document;
+        Array.prototype.forEach.call(document.querySelectorAll('link[rel=stylesheet][href*="fonts.googleapis"]'), function (l) { d.head.appendChild(l.cloneNode()); });
+        var s2 = d.createElement('style'); s2.textContent = PIPCSS; d.head.appendChild(s2);
+        d.body.innerHTML = '<div class="pp"><img class="bg" alt=""><img class="cv" alt=""><div class="tx"><b></b><span></span></div><div class="bar"><i></i></div><div class="ct">' +
+          '<button type="button" class="prev" aria-label="Previous">' + ICON.prev + '</button><button type="button" class="play" aria-label="Play">' + ICON.play + '</button>' +
+          '<button type="button" class="next" aria-label="Next">' + ICON.next + '</button><button type="button" class="back" aria-label="Back to the page" title="Back to the page">' + ICON.pip + '</button></div></div>';
+        d.querySelector('.play').addEventListener('click', function () { $('.np-play').click(); });
+        d.querySelector('.next').addEventListener('click', function () { $('.np-next').click(); });
+        d.querySelector('.prev').addEventListener('click', function () { $('.np-prev').click(); });
+        d.querySelector('.back').addEventListener('click', function () { w.close(); });
+        w.addEventListener('pagehide', function () { pipWin = null; });
+        pipPaint();
+      }, function (e) { flash('The small window could not open: ' + e.message); });
+    });
+
+    // Ready from last time: the cover shows the video you stopped on.
+    var last = read('yt-last');
+    var lastVideo = last && last.src && (last.src.video || (last.src.ids && last.src.ids[last.i || 0]));
+    if (lastVideo) { $('.yt-vid').style.backgroundImage = 'url("' + thumb(lastVideo) + '")'; $('.np-art').src = thumb(lastVideo); }
+    if (last && last.src) $('.yt-ph em').textContent = 'Press play to carry on';
+    window.addEventListener('pagehide', function () { if (pipWin) try { pipWin.close(); } catch (e) { } });
     window.addEventListener('storage', function (e) {
       if (e.key === 'yt-token') fill();
       if (e.key === LIB) { paint(); fill(); }
     });
     paint(); sync(); setPane('now');
     return {
-      fill: fill, sync: sync,
+      fill: fill, sync: sync, vidEl: $('.yt-vid'),
       info: function () {
-        return { title: S.connected ? S.title : '', author: S.connected ? S.channel : '', vid: S.connected ? S.video || '' : '', playing: S.connected && S.playing,
-          error: !remote || S.connected ? '' : 'Connect your browser on the YouTube tab', cur: S.connected ? position() : 0, dur: S.connected ? S.duration : 0 };
+        var d = player && player.getVideoData ? player.getVideoData() : null;
+        return { title: d && d.title || '', author: d && d.author || '', vid: d && d.video_id || '', playing: playing, error: playbackError,
+          cur: player && player.getCurrentTime ? player.getCurrentTime() || 0 : 0, dur: player && player.getDuration ? player.getDuration() || 0 : 0 };
       },
       track: trackObj,
-      toggle: function () { $('.np-play').click(); }, next: function () { cmd('next'); }, prev: function () { cmd('prev'); },
-      pause: function () { if (S.connected && S.playing && remote) remote.command('pause'); },
-      playing: function () { return S.connected && S.playing; },
-      // the island's type bar: a search in the Search band (a video link plays straight away, in your browser)
+      toggle: function () { $('.np-play').click(); }, next: function () { $('.np-next').click(); }, prev: function () { $('.np-prev').click(); }, pip: function () { $('.np-pip').click(); },
+      pause: function () { if (player && playing) try { player.pauseVideo(); } catch (e) { } },
+      playing: function () { return playing; },
+      // the island's type bar: a search in the Search band (a video link plays straight away)
       search: function (q) {
         q = String(q || '').trim(); if (!q) return;
         setPane('search'); $('.yt-sform input').value = q;
         var video = videoLink(q);
-        if (video) { searchSerial++; start({ video: video }, 'the video'); } else search(q, '', []);
+        if (video) { searchSerial++; start({ video: video }, 'YouTube video'); } else search(q, '', []);
       },
-      // the island's volume tile (0-100; null when no tab is connected)
+      // the island's volume tile (0-100; null when nothing is loaded)
       volume: function (v) {
-        if (!S.connected || !remote || S.via !== 'extension') return null;
-        if (v != null) { var n = Math.max(0, Math.min(100, +v)); remote.command('volume', n); S.volume = n; return n; }
-        return S.volume;
+        if (!player || !player.getVolume) return null;
+        try { if (v != null) { player.setVolume(Math.max(0, Math.min(100, +v))); if (+v > 0 && player.isMuted && player.isMuted()) player.unMute(); } return v != null ? +v : player.getVolume(); } catch (e) { return null; }
       }
     };
   }

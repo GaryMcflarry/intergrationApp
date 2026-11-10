@@ -3,7 +3,7 @@
    - the island: a small pill (what plays, or Discord) that opens into tabs, then the full player, then the whole screen
    - set-up happens in your browser: guide pages served by this app connect each service and hand the result over
    - Discord: Rich Presence follows what plays, a bot of yours brings in the latest messages, Share posts a song */
-const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage, screen, dialog, safeStorage, globalShortcut, session, clipboard } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, nativeImage, screen, dialog, safeStorage, globalShortcut, session } = require('electron');
 const path = require('node:path');
 const server = require('./lib/server');
 const { createStore } = require('./lib/store');
@@ -15,8 +15,6 @@ const { createApi } = require('./lib/api');
 const ICON = require('./lib/icon');
 const systemControls = require('./lib/system');
 const { createAiUsage, PROVIDERS: AI_PROVIDERS } = require('./lib/ai-usage');
-const { createYtBridge, command: ytCommand, watchUrl: ytWatchUrl } = require('./lib/yt-bridge');
-const { createMediaSession } = require('./lib/media-session');
 
 const ORIGIN = `http://127.0.0.1:${server.PORT}`;     // the island, the guides, Spotify's return address
 const GOOGLE = `http://localhost:${server.PORT}`;     // the YouTube guide (Google signs in here)
@@ -37,7 +35,7 @@ const MAC = process.platform === 'darwin';
 // Menu bar mode (Top bar mode on Windows): the island flush at the very top of a screen (ASTRUM_NOTCH=1 tries it on Linux)
 const NOTCH_OK = MAC || process.platform === 'win32' || process.env.ASTRUM_NOTCH === '1';
 let island = null, tray = null, store = null, presence = null, bot = null, quitting = false, full = null, lastStatus = { text: 'Starting…', ok: false };
-let social = null, aiUsage = null, ytBridge = null, mediaSession = null;
+let social = null, aiUsage = null;
 
 function sendAll(channel, payload) { for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload); }
 
@@ -306,8 +304,6 @@ function screensInfo() {
 function publicSettings() { const s = store.settings(); return { screens: screensInfo(), screen: anchorDisplay().id, alwaysOnTop: s.alwaysOnTop, placement: s.placement, shortcut: s.shortcut, shortcutOk, mac: MAC, notchOk: NOTCH_OK, openAtLogin: s.openAtLogin, discordId: !!s.discordId, presence: s.presence, webhook: !!s.webhook, bot: !!s.botToken, channels: s.channels }; }
 function setKv(key, value) { if (store.set(key, value)) sendAll('kv-changed', { key, value: value == null ? null : String(value) }); }
 
-function ytState() { const b = ytBridge.state(); return b.connected ? { ...b, via: 'extension' } : mediaSession.state(); }
-
 /* ---------- what the island may ask ---------- */
 function fromApp(e) { try { const o = new URL(e.senderFrame.url).origin; return o === ORIGIN || o === GOOGLE; } catch { return false; } }
 function wire() {
@@ -390,20 +386,6 @@ function wire() {
   ipcMain.handle('ai-refresh', (e, id) => (fromIsland(e) ? aiUsage.refresh(aiId(id) || undefined) : null));
   ipcMain.handle('ai-signin', (e, id) => (fromIsland(e) && aiId(id) ? aiSignIn(aiId(id)) : false));
   ipcMain.handle('ai-signout', (e, id) => (fromIsland(e) && aiId(id) ? aiSignOut(aiId(id)) : null));
-  // YouTube in your browser: what the tab plays, and the commands for it; the pairing code goes to the clipboard only
-  ipcMain.handle('yt-state', (e) => (fromIsland(e) ? ytState() : null));
-  ipcMain.handle('yt-command', (e, name, arg) => {
-    if (!fromIsland(e)) return false;
-    return ytBridge.state().connected ? ytBridge.send(String(name), arg) : mediaSession.send(String(name));
-  });
-  // no tab connected: the video or playlist opens on youtube.com in your default browser (a checked id only)
-  ipcMain.handle('yt-open', (e, arg) => {
-    const c = fromIsland(e) ? ytCommand('open', arg) : null;
-    if (!c) return false;
-    shell.openExternal(ytWatchUrl(c.arg)); return true;
-  });
-  ipcMain.handle('yt-code-copy', (e) => { if (!fromIsland(e)) return false; clipboard.writeText(ytBridge.code()); return true; });
-  ipcMain.handle('yt-code-new', (e) => { if (!fromIsland(e)) return false; clipboard.writeText(ytBridge.newCode()); return true; });
 }
 
 app.whenReady().then(async () => {
@@ -418,16 +400,6 @@ app.whenReady().then(async () => {
     fetchFor: aiFetch, dataDir: app.getPath('userData'),
     onState: (s) => { if (island && !island.isDestroyed()) island.webContents.send('ai-usage', s); }
   });
-  // YouTube: the browser extension when a tab is connected; the computer's own media controls while none is
-  const ytSend = () => { if (island && !island.isDestroyed()) island.webContents.send('yt-state', ytState()); };
-  ytBridge = createYtBridge({
-    getCode: () => store.settings().ytBridgeCode, setCode: (c) => store.setSettings({ ytBridgeCode: c }),
-    onState: (s) => { if (s.connected) mediaSession.stop(); else mediaSession.start(); ytSend(); }
-  });
-  mediaSession = createMediaSession({
-    adapterDir: path.join(app.isPackaged ? process.resourcesPath : __dirname, 'native', 'mediaremote-adapter'),
-    onState: () => { if (!ytBridge.state().connected) ytSend(); }
-  });
   bot = createBot({ getToken: getBotToken, getChannels: () => store.settings().channels, onFeed: (f) => sendAll('discord-feed', f) });
   const spotifyAuth = createSpotifyAuth({
     getClientId: () => store.get('np-client'), redirectUri: ORIGIN + '/spotify/callback',
@@ -435,7 +407,7 @@ app.whenReady().then(async () => {
   });
   const api = createApi({
     origins: [ORIGIN, GOOGLE], store, spotifyAuth, bot, presence, applySettings, setKv, setBotToken,
-    hasBotToken: () => !!store.settings().botToken, presenceStatus: () => lastStatus, ytBridge
+    hasBotToken: () => !!store.settings().botToken, presenceStatus: () => lastStatus
   });
   const installer = process.platform === 'win32' && !app.isPackaged
     ? path.join(__dirname, 'dist', `Astrum Setup ${app.getVersion()}.exe`) : null;
@@ -456,12 +428,10 @@ app.whenReady().then(async () => {
   presence.connect(s.discordId);
   if (s.botToken) bot.start();
   aiUsage.start();
-  ytBridge.start();
-  mediaSession.start();
   // first run: nothing set up yet, so the set-up guide opens in your browser
   if (!store.get('np-client') && !store.get('yt-client') && !s.discordId && !s.botToken) setTimeout(() => openGuide('index'), 1500);
 });
 app.on('second-instance', () => { if (island) { island.showInactive(); island.webContents.send('island-poke'); } });
 app.on('will-quit', () => globalShortcut.unregisterAll());
-app.on('before-quit', () => { quitting = true; if (social) social.stop(); if (aiUsage) aiUsage.stop(); if (ytBridge) ytBridge.stop(); if (mediaSession) mediaSession.stop(); if (store) store.flush(); if (presence) presence.stop(); if (bot) bot.stop(); });
+app.on('before-quit', () => { quitting = true; if (social) social.stop(); if (aiUsage) aiUsage.stop(); if (store) store.flush(); if (presence) presence.stop(); if (bot) bot.stop(); });
 app.on('window-all-closed', () => { /* stays in the tray */ });

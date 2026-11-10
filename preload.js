@@ -5,7 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 const on = {};
 function listen(channel) { on[channel] = []; ipcRenderer.on(channel, (_e, d) => on[channel].forEach((f) => f(d))); return (f) => { on[channel].push(f); }; }
 const onKv = listen('kv-changed'), onSettings = listen('settings'), onStatus = listen('discord-status'), onFeed = listen('discord-feed');
-const onSocial = listen('discord-social-state'), onAi = listen('ai-usage'), onYt = listen('yt-state');
+const onSocial = listen('discord-social-state'), onAi = listen('ai-usage');
 const onReflow = listen('island-reflow'), onPoke = listen('island-poke'), onPlace = listen('island-place'), onSummon = listen('island-summon'), onMedia = listen('island-media');
 
 contextBridge.exposeInMainWorld('desktop', {
@@ -41,18 +41,6 @@ contextBridge.exposeInMainWorld('desktop', {
     signIn: (id) => ipcRenderer.invoke('ai-signin', String(id)),
     signOut: (id) => ipcRenderer.invoke('ai-signout', String(id)),
     onState: onAi
-  },
-  // YouTube in your browser (Astrum's extension): what plays, the commands, and the pairing code (copied, never shown)
-  yt: {
-    state: () => ipcRenderer.invoke('yt-state'),
-    command: (name, arg) => ipcRenderer.invoke('yt-command', String(name), arg && typeof arg === 'object'
-      ? { v: String(arg.v || ''), list: String(arg.list || ''), index: Number.isInteger(arg.index) ? arg.index : undefined }
-      : (arg == null ? null : Number(arg))),
-    openExternal: (arg) => ipcRenderer.invoke('yt-open', arg && typeof arg === 'object'
-      ? { v: String(arg.v || ''), list: String(arg.list || ''), index: Number.isInteger(arg.index) ? arg.index : undefined } : null),
-    copyCode: () => ipcRenderer.invoke('yt-code-copy'),
-    newCode: () => ipcRenderer.invoke('yt-code-new'),
-    onState: onYt
   },
   openGuide: (what) => ipcRenderer.send('open-guide', String(what || 'index')),
   window: { openSetup: (url) => ipcRenderer.send('open-guide', String(url)) },   // the player's set-up links: their guide, in the browser
