@@ -11,11 +11,11 @@
 .aip .ai-go:hover, .ai-peek .ai-go:hover { background: color-mix(in srgb, var(--acc) 30%, transparent); }
 
 .ai-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.ai-head b { font-size: 14px; }
-.ai-head p, .ai-note { margin: 3px 0 0; font-size: 11px; color: var(--ink2); }
+.ai-head b { font-size: 15px; }
+.ai-head p, .ai-note { margin: 3px 0 0; font-size: 12px; color: var(--ink2); }
 .ai-note { margin: 0 4px; }
 .ai-cards { display: grid; gap: 10px; }
-.ai-st { margin: 0; font-size: 11px; color: var(--ink2); }
+.ai-st { margin: 0; font-size: 12px; color: var(--ink2); }
 .ai-st.err { color: #ffb4a8; }
 
 /* the card: a header, a section per window, the hourly bars, then the actions as menu rows */
@@ -24,19 +24,19 @@
 .ai-card > * + * { border-top: 1px solid var(--ai-line); }
 .ai-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .ai-card header div { display: grid; gap: 2px; min-width: 0; }
-.ai-card header b { font-size: 12.5px; }
-.ai-card header .ai-st { font-size: 10.5px; }
-.ai-plan { font-size: 10.5px; font-weight: 600; color: var(--ink2); text-transform: capitalize; }
+.ai-card header b { font-size: 14px; }
+.ai-card header .ai-st { font-size: 11.5px; }
+.ai-plan { font-size: 12px; font-weight: 600; color: var(--ink2); text-transform: capitalize; }
 
 .ai-sec { display: grid; gap: 7px; }
-.ai-sec h3 { margin: 0; font-size: 12.5px; font-weight: 700; }
+.ai-sec h3 { margin: 0; font-size: 14px; font-weight: 700; }
 .ai-det { display: flex; justify-content: space-between; gap: 10px; }
-.ai-det div { display: grid; gap: 1px; min-width: 0; font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ai-det div { display: grid; gap: 1px; min-width: 0; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .ai-det .r { text-align: right; }
 .ai-det span { color: var(--ink2); }
 
 /* a bar of what is left; the tick is where an even pace would be */
-.ai-bar { position: relative; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.ai-bar { position: relative; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .08); overflow: hidden; }
 .ai-bar i { display: block; height: 100%; border-radius: inherit; background: var(--ai-bar); transition: width .4s var(--ease); }
 .ai-bar.warn i { background: #f5b942; }
 .ai-bar.hi i { background: #ff6b5e; }
@@ -46,10 +46,10 @@
 .ai-bars { display: flex; align-items: flex-end; gap: 3px; height: 44px; }
 .ai-bars i { flex: 1; min-height: 2px; border-radius: 1px; background: var(--ai-bar); }
 .ai-bars i.none { height: 2px; opacity: .35; }
-.ai-hist small { font-size: 10.5px; color: var(--ink2); }
+.ai-hist small { font-size: 11.5px; color: var(--ink2); }
 
 .ai-menu { display: flex; gap: 2px; padding: 6px 0 !important; }
-.aip .ai-menu button { padding: 5px 8px; margin-left: -8px; background: none; color: var(--ink2); font-size: 11.5px; }
+.aip .ai-menu button { padding: 5px 8px; margin-left: -8px; background: none; color: var(--ink2); font-size: 12.5px; }
 .aip .ai-menu button + button { margin-left: 0; }
 .aip .ai-menu button:hover { background: rgba(255, 255, 255, .07); color: var(--ink); }
 .aip .ai-menu .ai-go { color: var(--ink); box-shadow: none; }
@@ -57,12 +57,12 @@
 /* 1 · peek */
 .ai-peek { display: grid; gap: 10px; padding-top: 4px; }
 .ai-prow { display: grid; grid-template-columns: 74px 1fr 1fr; align-items: center; gap: 12px; min-height: 30px; }
-.ai-prow b { font-size: 12.5px; }
+.ai-prow b { font-size: 13.5px; }
 .ai-prow .ai-st { grid-column: 2 / span 1; }
 .ai-prow .ai-go { justify-self: end; }
 .ai-prow .wide { grid-column: 2 / -1; }
 .ai-peek .ai-more { justify-self: start; }
 .ai-mini { display: grid; gap: 5px; min-width: 0; }
-.ai-mtop { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--ink2); }
+.ai-mtop { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ink2); }
 .ai-mtop b { color: var(--ink); font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .ai-bar i { transition: none; } }

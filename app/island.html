@@ -12,7 +12,8 @@
    The desktop window fits the active panel. */
 @property --acc { syntax: '<color>'; inherits: true; initial-value: #1ed760; }
 :root { color-scheme: dark; --acc: #1ed760; --glow: .25; --ink: #f5f3ff; --ink2: rgba(245, 243, 255, .65); --edge: rgba(255, 255, 255, .09);
-  --sp: #1ed760; --yt: #ff4e45; --dc: #5865f2; --ease: cubic-bezier(.22, 1, .36, 1); --full-opacity: .70; }
+  --sp: #1ed760; --yt: #ff4e45; --dc: #5865f2; --ease: cubic-bezier(.22, 1, .36, 1); --full-opacity: .70;
+  --yt-header: 44px; --yt-grab: 16px; }
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
 body { color: var(--ink); font: 500 13px/1.35 "Chakra Petch", "Segoe UI", system-ui, sans-serif; user-select: none; -webkit-font-smoothing: antialiased; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
@@ -234,6 +235,10 @@ body.moving .pill .pt, body.moving .pill .eq, body.moving .pill .badge, body.mov
 #isl[data-kind="ai"] .eq { display: none; }
 #isl[data-ai-heat="warn"] .pill .ic { color: #f5b942; }
 #isl[data-ai-heat="hi"] .pill .ic { color: #ff6b5e; }
+/* the closed island's turns (what plays <-> AI usage): the words and icon fade out, swap, and fade back in while the width eases */
+#isl .pill .pt, #isl .pill .ic { transition: opacity .28s ease, transform .28s var(--ease); }
+#isl.swap .pill .pt, #isl.swap .pill .ic { opacity: 0; transform: translateY(3px); }
+#isl.swapping { transition: width .6s var(--ease), height .26s var(--ease), border-radius .26s ease; }
 .idle-motion #isl[data-kind="app"] .idle { display: flex; }
 body:not(.idle-motion) #isl[data-kind="app"][data-l="0"] .pill .ic { animation:idle-breathe 4s ease-in-out infinite; }
 @keyframes idle-breathe { 0%,100% { opacity:.55; transform:scale(.94); } 50% { opacity:1; transform:scale(1); } }
@@ -421,8 +426,22 @@ body.np-full .np-dj .dj-glow { display: none; }
 .np-dj .dj-top .dj-go svg { width: 15px; height: 15px; }
 .np-dj .dj-tag { padding: 0 6px 0 0; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; font-size: 10.5px; letter-spacing: .18em; color: rgba(245, 243, 255, .7); }
 .np-dj .dj-tag i { width: 6px; height: 6px; }
+body.np-full .np-dj.m-yt { background: #08080c; padding: 0; gap: 0; grid-template-rows: var(--yt-header) minmax(0, 1fr) var(--yt-grab); }
+body.np-full .np-dj.m-yt .dj-top { padding: 0 12px; }
+body.np-full .np-dj.m-yt .dj-x { display: inline-flex; width: auto; padding: 0 10px; gap: 6px; font-size: 12px; }
+body.np-full .np-dj.m-yt .dj-mid { text-align: center; }
+body.np-full .np-dj.m-yt .dj-meta { justify-items: center; }
+body.np-full .np-dj.m-yt .dj-card, body.np-full .np-dj.m-yt .dj-glow,
+body.np-full .np-dj.m-yt .dj-prog, body.np-full .np-dj.m-yt .dj-bot,
+body.np-full .np-dj.m-yt .dj-prev, body.np-full .np-dj.m-yt .dj-next { display: none; }
+body.np-full .np-dj.m-yt .dj-yt-grab { display: grid; place-items: center; cursor: ns-resize; touch-action: none; }
+.dj-yt-grab::after { content: ""; width: 48px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, .3); }
+.dj-yt-grab:hover::after { background: rgba(255, 255, 255, .75); }
+body.np-full .np.yt-full .yt-vid { inset: var(--yt-header) 0 var(--yt-grab); width: auto; height: auto; aspect-ratio: auto; visibility: hidden; border-radius: 0; box-shadow: none; background: #000; }
+body.np-full .np.yt-full.yt-frame .yt-vid { visibility: visible; pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) {
   .pill .ic { animation:none!important; }
+  #isl.swap .pill .pt, #isl.swap .pill .ic { opacity: 1; transform: none; }   /* no fade: it simply changes */
   #isl, .aura { transition: none; } .pt.mq span, #isl.playing .eq i, .aura::before, .aura::after, .idle .ch i, #isl, .glow { animation: none !important; }
   .lv, .lv.on { transition: opacity .15s ease; transform: translateX(-50%); filter: none; }
 }
@@ -806,7 +825,7 @@ body.np-full .np-dj .dj-glow { display: none; }
     if (!t) {
       if (tab === 'sp') { p.appendChild(emptyBox('Nothing playing on Spotify', 'Choose where Spotify should play.', 'Choose a device', openDevices)); return; }
       var ytLib = window.YTMusic && YTMusic.library();
-      var watch = emptyBox('YouTube in your browser', 'Play something on youtube.com and control it from here, or connect your browser first.', 'Open YouTube controls', function () { go(2); });
+      var watch = emptyBox('YouTube', ytLib ? 'Search, open a playlist or start a mix.' : 'Paste a video link or connect your YouTube library.', 'Open the player', function () { go(2); });
       if (!ytLib) {
         var actions = el('div', 'empty-actions'), setup = el('button', 'go', 'Set up YouTube');
         setup.type = 'button'; setup.addEventListener('click', function () { guide('youtube'); });
@@ -900,11 +919,18 @@ body.np-full .np-dj .dj-glow { display: none; }
   function aiSpan(ms) { var m = Math.max(1, Math.round(ms / 60000)), h = Math.floor(m / 60); return h ? h + 'h ' + (m % 60) + 'm' : m + 'm'; }
   Astrum.theme.onChange(paintTabs); paintTabs();
   // the closed island takes turns: every 30 s the AI usage shows for 6 s, then what it showed before comes back
-  var aiTurn = false;
+  var aiTurn = false, swapT = 0;
+  function aiSwap(on) {
+    clearTimeout(swapT); isl.classList.add('swap', 'swapping');
+    swapT = setTimeout(function () {
+      aiTurn = on; paintPill(); isl.classList.remove('swap');
+      swapT = setTimeout(function () { isl.classList.remove('swapping'); }, 650);
+    }, 280);
+  }
   if (aiPanel) setInterval(function () {
     if (level !== 0 || aiTurn || Astrum.theme.get().aiRotate === false || !aiPanel.summary()) return;
-    aiTurn = true; paintPill();
-    setTimeout(function () { aiTurn = false; paintPill(); }, 6000);
+    aiSwap(true);
+    setTimeout(function () { aiSwap(false); }, 6000);
   }, 30000);
   if (aiPanel) new ResizeObserver(function () { if (level === 2 && tab === 'ai' && !setOpen) size(); }).observe($('.aip-in'));
   function discordView(personal) {
