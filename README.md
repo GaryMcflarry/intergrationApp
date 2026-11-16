@@ -80,6 +80,7 @@ lib/store.js         settings and sign-ins (a JSON file in the app's data folder
 app/island.html      the island
 app/nowplaying.js    the player (Spotify, the full view, DJ mode); app/ytmusic.js: YouTube
 app/guide/           the set-up guides
+app/paint/           Paint UI, a painterly component kit (docs/paint-ui.md; gallery at /paint/gallery.html)
 ```
 
 ## Checks
